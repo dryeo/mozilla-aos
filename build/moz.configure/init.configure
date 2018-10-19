@@ -336,6 +336,8 @@ def split_triplet(triplet):
         canonical_os = canonical_kernel = 'NetBSD'
     elif os.startswith('openbsd'):
         canonical_os = canonical_kernel = 'OpenBSD'
+    elif os.startswith('os2'):
+        canonical_os = canonical_kernel = 'OS2'
     else:
         die('Unknown OS: %s' % os)
 
