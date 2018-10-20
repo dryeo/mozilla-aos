@@ -11,7 +11,9 @@
 /* --- globals ------------------------------------------------ */
 _NSPR_TLS*        pThreadLocalStorage = 0;
 _PRInterruptTable             _pr_interruptTable[] = { { 0 } };
-APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD);
+APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD) = NULL;
+ULONG (* APIENTRY SafeWaitEventSem)(HEV hev, ULONG ulTimeout) = DosWaitEventSem;
+ULONG (* APIENTRY SafeRequestMutexSem)(HMTX hmtx, ULONG ulTimeout) = DosRequestMutexSem;
 
 void
 _PR_MD_ENSURE_TLS(void)
@@ -30,11 +32,34 @@ _PR_MD_ENSURE_TLS(void)
 void
 _PR_MD_EARLY_INIT()
 {
-   HMODULE hmod;
+    HMODULE hmod;
 
-   if (DosLoadModule(NULL, 0, "DOSCALL1", &hmod) == 0)
-       DosQueryProcAddr(hmod, 877, "DOSQUERYTHREADCONTEXT",
-                        (PFN *)&QueryThreadContext);
+    /*
+     * TODO QueryThreadContext usage is SERIOUSLY broken because:
+     * - QueryThreadContext will remain unitialized if missing in DOSCALL1;
+     * - a call to QueryThreadContext in os2gc.c incorrectly treats its return
+     *   value as BOOL.
+     */
+    if (DosLoadModule(NULL, 0, "DOSCALL1", &hmod) == NO_ERROR)
+        DosQueryProcAddr(hmod, 877, "DOSQUERYTHREADCONTEXT",
+                         (PFN *)&QueryThreadContext);
+
+    /*
+     * Use PM-friendly variants for DosWaitEventSem and DosRequestMutexSem when
+     * they are available. This avoids blocking the entire PM when NSPR blocking
+     * APIs are called on a GUI thread that is supposed to process all incoming
+     * PM messages.
+     */
+
+    if (DosLoadModule(NULL, 0, "PMWIN", &hmod) == NO_ERROR) {
+        DosQueryProcAddr(hmod, 978, "WINWAITEVENTSEM",
+                             (PFN *)&SafeWaitEventSem);
+    }
+
+    if (DosLoadModule(NULL, 0, "PMWIN", &hmod) == NO_ERROR) {
+        DosQueryProcAddr(hmod, 979, "WINREQUESTMUTEXSEM",
+                             (PFN *)&SafeRequestMutexSem);
+    }
 }
 
 static void

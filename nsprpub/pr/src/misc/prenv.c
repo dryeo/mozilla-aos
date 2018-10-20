@@ -112,7 +112,7 @@ PR_IMPLEMENT(PRStatus) PR_SetEnv(const char *string)
     return result ? PR_FAILURE : PR_SUCCESS;
 }
 
-#if defined(XP_UNIX) && (!defined(DARWIN) || defined(HAVE_CRT_EXTERNS_H))
+#if defined(XP_UNIX) && (!defined(DARWIN) || defined(HAVE_CRT_EXTERNS_H)) || defined(XP_OS2)
 PR_IMPLEMENT(char **) PR_DuplicateEnvironment(void)
 {
     char **the_environ, **result, **end, **src, **dst;

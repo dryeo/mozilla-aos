@@ -48,6 +48,9 @@
 #elif defined(SOLARIS)
 #include <thread.h>
 #elif defined(OS2)
+#ifdef __EMX__
+#define OS2EMX_PLAIN_CHAR
+#endif
 #define INCL_BASE
 #define INCL_PM
 #include <os2.h>

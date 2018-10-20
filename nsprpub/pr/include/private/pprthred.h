@@ -13,6 +13,9 @@
 #include "nspr.h"
 
 #if defined(XP_OS2)
+#if defined(__EMX__) && !defined(OS2EMX_PLAIN_CHAR)
+#define OS2EMX_PLAIN_CHAR
+#endif
 #define INCL_BASE
 #define INCL_PM
 #include <os2.h>

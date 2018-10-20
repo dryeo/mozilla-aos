@@ -20,53 +20,9 @@
 
 struct _MDLock               _pr_ioq_lock;
 
-static PRBool isWSEB = PR_FALSE; /* whether we are using an OS/2 kernel that supports large files */
-
-typedef APIRET (*DosOpenLType)(PSZ pszFileName, PHFILE pHf, PULONG pulAction,
-                            LONGLONG cbFile, ULONG ulAttribute,
-                            ULONG fsOpenFlags, ULONG fsOpenMode,
-                            PEAOP2 peaop2);
-
-typedef APIRET (*DosSetFileLocksLType)(HFILE hFile, PFILELOCKL pflUnlock,
-                                    PFILELOCKL pflLock, ULONG timeout,
-                                    ULONG flags);
-
-typedef APIRET (*DosSetFilePtrLType)(HFILE hFile, LONGLONG ib, ULONG method,
-                                  PLONGLONG ibActual);
-
-DosOpenLType myDosOpenL;
-DosSetFileLocksLType myDosSetFileLocksL;
-DosSetFilePtrLType myDosSetFilePtrL;
-
 void
 _PR_MD_INIT_IO()
 {
-    APIRET rc;
-    HMODULE module;
-
-    sock_init();
-    
-    rc = DosLoadModule(NULL, 0, "DOSCALL1", &module);
-    if (rc != NO_ERROR)
-    {
-        return;
-    }
-    rc = DosQueryProcAddr(module, 981, NULL, (PFN*) &myDosOpenL);
-    if (rc != NO_ERROR)
-    {
-        return;
-    }
-    rc = DosQueryProcAddr(module, 986, NULL, (PFN*) &myDosSetFileLocksL);
-    if (rc != NO_ERROR)
-    {
-        return;
-    }
-    rc = DosQueryProcAddr(module, 988, NULL, (PFN*) &myDosSetFilePtrL);
-    if (rc != NO_ERROR)
-    {
-        return;
-    }
-    isWSEB = PR_TRUE;
 }
 
 PRStatus
@@ -77,7 +33,7 @@ _PR_MD_WAIT(PRThread *thread, PRIntervalTime ticks)
 
     PRUint32 msecs = (ticks == PR_INTERVAL_NO_TIMEOUT) ?
         SEM_INDEFINITE_WAIT : PR_IntervalToMilliseconds(ticks);
-    rv = DosWaitEventSem(thread->md.blocked_sema, msecs);
+    rv = SafeWaitEventSem(thread->md.blocked_sema, msecs);
     DosResetEventSem(thread->md.blocked_sema, &count); 
     switch(rv) 
     {
@@ -98,7 +54,7 @@ _PR_MD_WAIT(PRThread *thread, PRIntervalTime ticks)
                      * call SemRequest() to clear the semaphore.
                      */
                     _PR_THREAD_UNLOCK(thread);
-                    rv = DosWaitEventSem(thread->md.blocked_sema, 0);
+                    rv = SafeWaitEventSem(thread->md.blocked_sema, 0);
                     DosResetEventSem(thread->md.blocked_sema, &count); 
                     PR_ASSERT(rv == NO_ERROR);
                 }
@@ -118,484 +74,221 @@ _PR_MD_WAKEUP_WAITER(PRThread *thread)
         if (DosPostEventSem(thread->md.blocked_sema) != NO_ERROR)
             return PR_FAILURE;
         else
-			return PR_SUCCESS;
-	}
+            return PR_SUCCESS;
+    }
 }
 
-
-/* --- FILE IO ----------------------------------------------------------- */
-/*
- *  _PR_MD_OPEN() -- Open a file
- *
- *  returns: a fileHandle
- *
- *  The NSPR open flags (osflags) are translated into flags for OS/2
- *
- *  Mode seems to be passed in as a unix style file permissions argument
- *  as in 0666, in the case of opening the logFile. 
- *
- */
 PRInt32
-_PR_MD_OPEN(const char *name, PRIntn osflags, int mode)
+_PR_MD_OPEN(const char *name, PRIntn flags, int mode)
 {
-    HFILE file;
-    PRInt32 access = OPEN_SHARE_DENYNONE;
-    PRInt32 flags = 0L;
-    APIRET rc = 0;
-    PRUword actionTaken;
+    /* NOTE: the below code is mostly borrowed from unix.c */
+    PRInt32 osflags;
+    PRInt32 rv;
 
-#ifdef MOZ_OS2_HIGH_MEMORY
-    /*
-     * All the pointer arguments (&file, &actionTaken and name) have to be in
-     * low memory for DosOpen to use them.
-     * The following moves name to low memory.
-     */ 
-    if ((ULONG)name >= 0x20000000)
-    {
-        size_t len = strlen(name) + 1;
-        char *copy = (char *)alloca(len);
-        memcpy(copy, name, len);
-        name = copy;
+    if (flags & PR_RDWR) {
+        osflags = O_RDWR;
+    } else if (flags & PR_WRONLY) {
+        osflags = O_WRONLY;
+    } else {
+        osflags = O_RDONLY;
     }
+
+    if (flags & PR_EXCL)
+        osflags |= O_EXCL;
+    if (flags & PR_APPEND)
+        osflags |= O_APPEND;
+    if (flags & PR_TRUNCATE)
+        osflags |= O_TRUNC;
+    if (flags & PR_SYNC) {
+#if defined(O_SYNC)
+        osflags |= O_SYNC;
+#elif defined(O_FSYNC)
+        osflags |= O_FSYNC;
+#else
+#error "Neither O_SYNC nor O_FSYNC is defined on this platform"
 #endif
-
-    if (osflags & PR_SYNC) access |= OPEN_FLAGS_WRITE_THROUGH;
-
-    if (osflags & PR_RDONLY)
-        access |= OPEN_ACCESS_READONLY;
-    else if (osflags & PR_WRONLY)
-        access |= OPEN_ACCESS_WRITEONLY;
-    else if(osflags & PR_RDWR)
-        access |= OPEN_ACCESS_READWRITE;
-
-    /* How to interptet ERROR_OPEN_FAILED */
-    PRInt32 openFailedRc = ERROR_FILE_NOT_FOUND;
-
-    if ( osflags & PR_CREATE_FILE && osflags & PR_EXCL )
-    {
-        flags = OPEN_ACTION_CREATE_IF_NEW | OPEN_ACTION_FAIL_IF_EXISTS;
-        openFailedRc = ERROR_FILE_EXISTS;
-    }
-    else if (osflags & PR_CREATE_FILE)
-    {
-        if (osflags & PR_TRUNCATE)
-            flags = OPEN_ACTION_CREATE_IF_NEW | OPEN_ACTION_REPLACE_IF_EXISTS;
-        else
-            flags = OPEN_ACTION_CREATE_IF_NEW | OPEN_ACTION_OPEN_IF_EXISTS;
-    } 
-    else
-    {
-        if (osflags & PR_TRUNCATE)
-            flags = OPEN_ACTION_FAIL_IF_NEW | OPEN_ACTION_REPLACE_IF_EXISTS;
-        else
-            flags = OPEN_ACTION_FAIL_IF_NEW | OPEN_ACTION_OPEN_IF_EXISTS;
     }
 
-    do {
-        if (isWSEB)
-        {
-                rc = myDosOpenL((char*)name,
-                     &file,            /* file handle if successful */
-                     &actionTaken,     /* reason for failure        */
-                     0,                /* initial size of new file  */
-                     FILE_NORMAL,      /* file system attributes    */
-                     flags,            /* Open flags                */
-                     access,           /* Open mode and rights      */
-                     0);               /* OS/2 Extended Attributes  */
-                if (rc == ERROR_OPEN_FAILED)
-                    rc = openFailedRc;
-        }
-        else
-        {
-                rc = DosOpen((char*)name,
-                     &file,            /* file handle if successful */
-                     &actionTaken,     /* reason for failure        */
-                     0,                /* initial size of new file  */
-                     FILE_NORMAL,      /* file system attributes    */
-                     flags,            /* Open flags                */
-                     access,           /* Open mode and rights      */
-                     0);               /* OS/2 Extended Attributes  */
-                if (rc == ERROR_OPEN_FAILED)
-                    rc = openFailedRc;
-        };
-        if (rc == ERROR_TOO_MANY_OPEN_FILES) {
-            ULONG CurMaxFH = 0;
-            LONG ReqCount = 20;
-            APIRET rc2;
-            rc2 = DosSetRelMaxFH(&ReqCount, &CurMaxFH);
-            if (rc2 != NO_ERROR) {
-                break;
-            }
-        }
-    } while (rc == ERROR_TOO_MANY_OPEN_FILES);
+    if (flags & PR_CREATE_FILE)
+        osflags |= O_CREAT;
 
-    if (rc != NO_ERROR) {
-        _PR_MD_MAP_OPEN_ERROR(rc);
-        return -1; 
+    /* Files opened by NSPR are not expected to perform EOL translation */
+    rv = open(name, osflags | O_BINARY, mode);
+
+    if (rv < 0) {
+        _PR_MD_MAP_OPEN_ERROR(_MD_ERRNO());
     }
 
-    return (PRInt32)file;
+    return rv;
 }
 
 PRInt32
-_PR_MD_READ(PRFileDesc *fd, void *buf, PRInt32 len)
-{
-    ULONG bytes;
-    int rv;
-
-    rv = DosRead((HFILE)fd->secret->md.osfd,
-                 (PVOID)buf,
-                 len,
-                 &bytes);
-    
-    if (rv != NO_ERROR) 
-    {
-        /* ERROR_HANDLE_EOF can only be returned by async io */
-        PR_ASSERT(rv != ERROR_HANDLE_EOF);
-        if (rv == ERROR_BROKEN_PIPE)
-            return 0;
-		else {
-			_PR_MD_MAP_READ_ERROR(rv);
-        return -1;
-    }
-    }
-    return (PRInt32)bytes;
-}
-
-#if defined(MOZ_OS2_HIGH_MEMORY)
-/* DosWrite can't cope with high memory and there is no Safe wrapper for it yet, provide one. */
-ULONG SafeDosWrite(HFILE hFile, CPVOID pBuffer, ULONG ulLength, PULONG pulBytesWritten)
-{
-    APIRET arc;
-    PVOID safe_pBuffer = NULL;
-    ULONG safe_pulBytesWritten = pulBytesWritten ? *pulBytesWritten : 0;
-
-    if (((unsigned)pBuffer) >= 512*1024*1024)
-    {
-        ULONG hType, hFlags;
-        arc = DosQueryHType(hFile, &hType, &hFlags);
-        if (arc != NO_ERROR)
-            return arc;
-
-        if (hType == HANDTYPE_DEVICE)
-        {
-            /* This is a KBD/VIO or another character device, most likely it can't work
-             * with high memory. Transfer the buffer to low area. */
-            safe_pBuffer = _lmalloc(ulLength);
-            if (safe_pBuffer == NULL)
-                return ERROR_NOT_ENOUGH_MEMORY;
-            memcpy(safe_pBuffer, pBuffer, ulLength);
-        }
-    }
-
-    arc = DosWrite(hFile, safe_pBuffer ? safe_pBuffer : pBuffer, ulLength, &safe_pulBytesWritten);
-
-    if (pulBytesWritten)
-        *pulBytesWritten = safe_pulBytesWritten;
-
-    if (safe_pBuffer)
-        free(safe_pBuffer);
-
-    return arc;
-}
-#define DosWrite SafeDosWrite
-#endif
-
-PRInt32
-_PR_MD_WRITE(PRFileDesc *fd, const void *buf, PRInt32 len)
-{
-    PRInt32 bytes;
-    int rv; 
-
-    rv = DosWrite((HFILE)fd->secret->md.osfd,
-                  (PVOID)buf,
-                  len,
-                  (PULONG)&bytes);
-
-    if (rv != NO_ERROR) 
-    {
-        _PR_MD_MAP_WRITE_ERROR(rv);
-        return -1;
-    }
-
-    if (len != bytes) {
-        rv = ERROR_DISK_FULL;
-        _PR_MD_MAP_WRITE_ERROR(rv);
-        return -1;
-    }
-
-    return bytes;
-} /* --- end _PR_MD_WRITE() --- */
-
-PRInt32
-_PR_MD_LSEEK(PRFileDesc *fd, PRInt32 offset, PRSeekWhence whence)
+_PR_MD_READ(PRFileDesc *fd, void *buf, PRInt32 amount)
 {
     PRInt32 rv;
-    PRUword newLocation;
 
-    rv = DosSetFilePtr((HFILE)fd->secret->md.osfd, offset, whence, &newLocation);
+    rv = read(fd->secret->md.osfd, buf, amount);
+    if (rv < 0) {
+        _PR_MD_MAP_READ_ERROR(_MD_ERRNO());
+    }
 
-	if (rv != NO_ERROR) {
-		_PR_MD_MAP_LSEEK_ERROR(rv);
-		return -1;
-	} else
-		return newLocation;
+    return rv;
 }
 
-PRInt64
-_PR_MD_LSEEK64(PRFileDesc *fd, PRInt64 offset, PRSeekWhence whence)
+PRInt32
+_PR_MD_WRITE(PRFileDesc *fd, const void *buf, PRInt32 amount)
 {
-#ifdef NO_LONG_LONG
-    PRInt64 result;
-    PRInt32 rv, low = offset.lo, hi = offset.hi;
-    PRUword newLocation;
+    PRInt32 rv;
 
-    rv = DosSetFilePtr((HFILE)fd->secret->md.osfd, low, whence, &newLocation);
-    rv = DosSetFilePtr((HFILE)fd->secret->md.osfd, hi, FILE_CURRENT, &newLocation);
-
-  	if (rv != NO_ERROR) {
-		_PR_MD_MAP_LSEEK_ERROR(rv);
-		hi = newLocation = -1;
-   }
-
-    result.lo = newLocation;
-    result.hi = hi;
-	return result;
-
-#else
-    PRInt32 where, rc, lo = (PRInt32)offset, hi = (PRInt32)(offset >> 32);
-    PRUint64 rv;
-    PRUint32 newLocation, uhi;
-    PRUint64 newLocationL;
-
-    switch (whence)
-      {
-      case PR_SEEK_SET:
-        where = FILE_BEGIN;
-        break;
-      case PR_SEEK_CUR:
-        where = FILE_CURRENT;
-        break;
-      case PR_SEEK_END:
-        where = FILE_END;
-        break;
-      default:
-        PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
-        return -1;
-    }
-    if (isWSEB)
-    {
-        rc = myDosSetFilePtrL((HFILE)fd->secret->md.osfd, offset, where, (PLONGLONG)&newLocationL);
-    }
-    else
-    {
-        rc = DosSetFilePtr((HFILE)fd->secret->md.osfd, lo, where, (PULONG)&newLocation);
-    }
-     
-    if (rc != NO_ERROR) {
-      _PR_MD_MAP_LSEEK_ERROR(rc);
-      return -1;
-    }
-    
-    if (isWSEB)
-    {
-        return newLocationL;
+    rv = write(fd->secret->md.osfd, buf, amount);
+    if (rv < 0) {
+        _PR_MD_MAP_READ_ERROR(_MD_ERRNO());
     }
 
-    uhi = (PRUint32)hi;
-    PR_ASSERT((PRInt32)uhi >= 0);
-    rv = uhi;
-    PR_ASSERT((PRInt64)rv >= 0);
-    rv = (rv << 32);
-    PR_ASSERT((PRInt64)rv >= 0);
-    rv += newLocation;
-    PR_ASSERT((PRInt64)rv >= 0);
-    return (PRInt64)rv;
-#endif
+    return rv;
+}
+
+PROffset64
+_PR_MD_LSEEK64(PRFileDesc *fd, PROffset64 offset, PRSeekWhence whence)
+{
+    PR_STATIC_ASSERT(sizeof(off_t) == sizeof(PROffset64));
+
+    PROffset64 rv, where;
+
+    switch (whence) {
+        case PR_SEEK_SET:
+            where = SEEK_SET;
+            break;
+        case PR_SEEK_CUR:
+            where = SEEK_CUR;
+            break;
+        case PR_SEEK_END:
+            where = SEEK_END;
+            break;
+        default:
+            PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
+            return -1;
+    }
+    rv = lseek(fd->secret->md.osfd, offset, where);
+    if (rv == -1) {
+        _PR_MD_MAP_LSEEK_ERROR(_MD_ERRNO());
+    }
+
+    return rv;
+}
+
+PROffset32
+_PR_MD_LSEEK(PRFileDesc *fd, PROffset32 offset, PRSeekWhence whence)
+{
+    return _PR_MD_LSEEK64(fd, offset, whence);
 }
 
 PRInt32
 _PR_MD_FSYNC(PRFileDesc *fd)
 {
-    PRInt32 rc = DosResetBuffer((HFILE)fd->secret->md.osfd);
+    PRInt32 rv;
 
-    if (rc != NO_ERROR) {
-   	if (rc != ERROR_ACCESS_DENIED) {	
-   			_PR_MD_MAP_FSYNC_ERROR(rc);
-   	    return -1;
-   	}
+    rv = fsync(fd->secret->md.osfd);
+    if (rv == -1) {
+        _PR_MD_MAP_FSYNC_ERROR(_MD_ERRNO());
     }
-    return 0;
+
+    return rv;
 }
 
 PRInt32
 _MD_CloseFile(PRInt32 osfd)
 {
     PRInt32 rv;
-    
-    rv = DosClose((HFILE)osfd);
- 	if (rv != NO_ERROR)
-		_PR_MD_MAP_CLOSE_ERROR(rv);
+
+    rv = close(osfd);
+    if (rv == -1) {
+        _PR_MD_MAP_CLOSE_ERROR(_MD_ERRNO());
+    }
+
     return rv;
 }
-
-
-/* --- DIR IO ------------------------------------------------------------ */
-#define GetFileFromDIR(d)       (isWSEB?(d)->d_entry.large.achName:(d)->d_entry.small.achName)
-#define GetFileAttr(d)          (isWSEB?(d)->d_entry.large.attrFile:(d)->d_entry.small.attrFile)
-
-void FlipSlashes(char *cp, int len)
-{
-    while (--len >= 0) {
-    if (cp[0] == '/') {
-        cp[0] = PR_DIRECTORY_SEPARATOR;
-    }
-    cp++;
-    }
-}
-
-/*
-**
-** Local implementations of standard Unix RTL functions which are not provided
-** by the VAC RTL.
-**
-*/
 
 PRInt32
 _PR_MD_CLOSE_DIR(_MDDir *d)
 {
-   PRInt32 rc;
+    PRInt32 rv = 0;
 
-    if ( d ) {
-      rc = DosFindClose(d->d_hdl);
-      if(rc == NO_ERROR){
-        d->magic = (PRUint32)-1;
-        return PR_SUCCESS;
-		} else {
-			_PR_MD_MAP_CLOSEDIR_ERROR(rc);
-        	return PR_FAILURE;
-		}
+    if (d->d) {
+        rv = closedir(d->d);
+        if (rv == -1) {
+            _PR_MD_MAP_CLOSEDIR_ERROR(_MD_ERRNO());
+        }
     }
-    PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
-    return PR_FAILURE;
+    return rv;
 }
-
 
 PRStatus
 _PR_MD_OPEN_DIR(_MDDir *d, const char *name)
 {
-    char filename[ CCHMAXPATH ];
-    PRUword numEntries, rc;
-
-    numEntries = 1;
-
-    PR_snprintf(filename, CCHMAXPATH, "%s%s%s",
-                name, PR_DIRECTORY_SEPARATOR_STR, "*.*");
-    FlipSlashes( filename, strlen(filename) );
-
-    d->d_hdl = HDIR_CREATE;
-
-    if (isWSEB)
-    {
-        rc = DosFindFirst( filename,
-                           &d->d_hdl,
-                           FILE_DIRECTORY | FILE_HIDDEN,
-                           &(d->d_entry.large),
-                           sizeof(d->d_entry.large),
-                           &numEntries,
-                           FIL_STANDARDL);
-    }
-    else
-    {
-        rc = DosFindFirst( filename,
-                           &d->d_hdl,
-                           FILE_DIRECTORY | FILE_HIDDEN,
-                           &(d->d_entry.small),
-                           sizeof(d->d_entry.small),
-                           &numEntries,
-                           FIL_STANDARD);
-    }
-    if ( rc != NO_ERROR ) {
-		_PR_MD_MAP_OPENDIR_ERROR(rc);
+    d->d = opendir(name);
+    if (!d->d) {
+        _PR_MD_MAP_OPENDIR_ERROR(_MD_ERRNO());
         return PR_FAILURE;
     }
-    d->firstEntry = PR_TRUE;
-    d->magic = _MD_MAGIC_DIR;
     return PR_SUCCESS;
 }
 
 char *
 _PR_MD_READ_DIR(_MDDir *d, PRIntn flags)
 {
-    PRUword numFiles = 1;
-    BOOL rv;
-    char *fileName;
-    USHORT fileAttr;
+    struct dirent *de;
 
-    if ( d ) {
-       while (1) {
-           if (d->firstEntry) {
-               d->firstEntry = PR_FALSE;
-               rv = NO_ERROR;
-           } else {
-               rv = DosFindNext(d->d_hdl,
-                                &(d->d_entry),
-                                sizeof(d->d_entry),
-                                &numFiles);
-           }
-           if (rv != NO_ERROR) {
-               break;
-           }
-           fileName = GetFileFromDIR(d);
-           fileAttr = GetFileAttr(d);
-           if ( (flags & PR_SKIP_DOT) &&
-                (fileName[0] == '.') && (fileName[1] == '\0'))
-                continue;
-           if ( (flags & PR_SKIP_DOT_DOT) &&
-                (fileName[0] == '.') && (fileName[1] == '.') &&
-                (fileName[2] == '\0'))
-                continue;
-			/*
-			 * XXX
-			 * Is this the correct definition of a hidden file on OS/2?
-			 */
-           if ((flags & PR_SKIP_NONE) && (fileAttr & FILE_HIDDEN))
-                return fileName;
-           else if ((flags & PR_SKIP_HIDDEN) && (fileAttr & FILE_HIDDEN))
-                continue;
-           return fileName;
+    for (;;) {
+        /*
+          * XXX: readdir() is not MT-safe. There is an MT-safe version
+          * readdir_r() on some systems.
+          */
+        _MD_ERRNO() = 0;
+        de = readdir(d->d);
+        if (!de) {
+            _PR_MD_MAP_READDIR_ERROR(_MD_ERRNO());
+            return 0;
         }
-        PR_ASSERT(NO_ERROR != rv);
-			_PR_MD_MAP_READDIR_ERROR(rv);
-        return NULL;
-		}
-    PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
-    return NULL;
+        if ((flags & PR_SKIP_DOT) &&
+            (de->d_name[0] == '.') && (de->d_name[1] == 0))
+            continue;
+        if ((flags & PR_SKIP_DOT_DOT) &&
+            (de->d_name[0] == '.') && (de->d_name[1] == '.') &&
+            (de->d_name[2] == 0))
+            continue;
+        /* TODO: Respect only the OS/2 attribute for hidden files for now */
+#if 1
+        if ((flags & PR_SKIP_HIDDEN) && (de->d_attr & FILE_HIDDEN))
+#else
+        if ((flags & PR_SKIP_HIDDEN) && (de->d_name[0] == '.'))
+#endif
+            continue;
+        break;
+    }
+    return de->d_name;
 }
 
 PRInt32
 _PR_MD_DELETE(const char *name)
 {
-    PRInt32 rc = DosDelete((char*)name);
-    if(rc == NO_ERROR) {
-        return 0;
-    } else {
-		_PR_MD_MAP_DELETE_ERROR(rc);
-        return -1;
+    PRInt32 rv;
+
+    rv = unlink(name);
+    if (rv == -1) {
+        _PR_MD_MAP_DELETE_ERROR(_MD_ERRNO());
     }
+
+    return rv;
 }
 
 PRInt32
 _PR_MD_STAT(const char *fn, struct stat *info)
 {
     PRInt32 rv;
-    char filename[CCHMAXPATH];
 
-    PR_snprintf(filename, CCHMAXPATH, "%s", fn);
-    FlipSlashes(filename, strlen(filename));
-
-    rv = _stat((char*)filename, info);
-    if (-1 == rv) {
+    rv = _stat(fn, info);
+    if (rv == -1) {
         /*
          * Check for MSVC runtime library _stat() bug.
          * (It's really a bug in FindFirstFile().)
@@ -622,36 +315,8 @@ _PR_MD_STAT(const char *fn, struct stat *info)
         }
     }
 
-    if (-1 == rv) {
-        _PR_MD_MAP_STAT_ERROR(errno);
-    }
-    return rv;
-}
-
-PRInt32
-_PR_MD_GETFILEINFO(const char *fn, PRFileInfo *info)
-{
-    struct stat sb;
-    PRInt32 rv;
-    PRInt64 s, s2us;
- 
-    if ( (rv = _PR_MD_STAT(fn, &sb)) == 0 ) {
-        if (info) {
-            if (S_IFREG & sb.st_mode)
-                info->type = PR_FILE_FILE ;
-            else if (S_IFDIR & sb.st_mode)
-                info->type = PR_FILE_DIRECTORY;
-            else
-                info->type = PR_FILE_OTHER;
-            info->size = sb.st_size;
-            LL_I2L(s2us, PR_USEC_PER_SEC);
-            LL_I2L(s, sb.st_mtime);
-            LL_MUL(s, s, s2us);
-            info->modifyTime = s;
-            LL_I2L(s, sb.st_ctime);
-            LL_MUL(s, s, s2us);
-            info->creationTime = s;
-        }
+    if (rv == -1) {
+        _PR_MD_MAP_STAT_ERROR(_MD_ERRNO());
     }
     return rv;
 }
@@ -659,34 +324,87 @@ _PR_MD_GETFILEINFO(const char *fn, PRFileInfo *info)
 PRInt32
 _PR_MD_GETFILEINFO64(const char *fn, PRFileInfo64 *info)
 {
-    PRFileInfo info32;
-    PRInt32 rv = _PR_MD_GETFILEINFO(fn, &info32);
-    if (rv != 0)
-    {
+    struct stat sb;
+    PRInt32 rv;
+    PRInt64 s, s2us;
+
+    PR_STATIC_ASSERT(sizeof(sb.st_size) == sizeof(info->size));
+
+    rv = _PR_MD_STAT(fn, &sb);
+    if (rv == -1) {
+        _PR_MD_MAP_STAT_ERROR(_MD_ERRNO());
         return rv;
     }
-    info->type = info32.type;
-    LL_UI2L(info->size,info32.size);
-    info->modifyTime = info32.modifyTime;
-    info->creationTime = info32.creationTime;
+
+    if (info) {
+        if (S_IFREG & sb.st_mode)
+            info->type = PR_FILE_FILE;
+        else if (S_IFDIR & sb.st_mode)
+            info->type = PR_FILE_DIRECTORY;
+        else
+            info->type = PR_FILE_OTHER;
+        info->size = sb.st_size;
+        LL_I2L(s2us, PR_USEC_PER_SEC);
+        LL_I2L(s, sb.st_mtime);
+        LL_MUL(s, s, s2us);
+        info->modifyTime = s;
+        LL_I2L(s, sb.st_ctime);
+        LL_MUL(s, s, s2us);
+        info->creationTime = s;
+    }
+
+    return rv;
+}
+
+PRInt32
+_PR_MD_GETFILEINFO(const char *fn, PRFileInfo *info)
+{
+    PRFileInfo64 info64;
+    PRInt32 rv = _PR_MD_GETFILEINFO64(fn, &info64);
+    if (rv == -1) {
+        return rv;
+    }
+
+    if (info) {
+        info->type = info64.type;
+        info->size = info64.size;
+        info->modifyTime = info64.modifyTime;
+        info->creationTime = info64.creationTime;
+    }
     
-    if (isWSEB)
-    {
-        APIRET rc ;
-        FILESTATUS3L fstatus;
+    return rv;
+}
 
-        rc = DosQueryPathInfo(fn, FIL_STANDARDL, &fstatus, sizeof(fstatus));
+PRInt32
+_PR_MD_GETOPENFILEINFO64(const PRFileDesc *fd, PRFileInfo64 *info)
+{
+    struct stat sb;
+    PRInt32 rv;
+    PRInt64 s, s2us;
 
-        if (NO_ERROR != rc)
-        {
-            _PR_MD_MAP_OPEN_ERROR(rc);
-            return -1;
-        }
+    PR_STATIC_ASSERT(sizeof(sb.st_size) == sizeof(info->size));
 
-        if (! (fstatus.attrFile & FILE_DIRECTORY))
-        {
-            info->size = fstatus.cbFile;
-        }
+    rv = fstat(fd->secret->md.osfd, &sb);
+    if (rv == -1) {
+        _PR_MD_MAP_FSTAT_ERROR(_MD_ERRNO());
+        return rv;
+    }
+
+    if (info) {
+        if (S_IFREG & sb.st_mode)
+            info->type = PR_FILE_FILE;
+        else if (S_IFDIR & sb.st_mode)
+            info->type = PR_FILE_DIRECTORY;
+        else
+            info->type = PR_FILE_OTHER;
+        info->size = sb.st_size;
+        LL_I2L(s2us, PR_USEC_PER_SEC);
+        LL_I2L(s, sb.st_mtime);
+        LL_MUL(s, s, s2us);
+        info->modifyTime = s;
+        LL_I2L(s, sb.st_ctime);
+        LL_MUL(s, s, s2us);
+        info->creationTime = s;
     }
 
     return rv;
@@ -695,295 +413,183 @@ _PR_MD_GETFILEINFO64(const char *fn, PRFileInfo64 *info)
 PRInt32
 _PR_MD_GETOPENFILEINFO(const PRFileDesc *fd, PRFileInfo *info)
 {
-   /* For once, the VAC compiler/library did a nice thing.
-    * The file handle used by the C runtime is the same one
-    * returned by the OS when you call DosOpen().  This means
-    * that you can take an OS HFILE and use it with C file
-    * functions.  The only caveat is that you have to call
-    * _setmode() first to initialize some junk.  This is
-    * immensely useful because I did not have a clue how to
-    * implement this function otherwise.  The windows folks
-    * took the source from the Microsoft C library source, but
-    * IBM wasn't kind enough to ship the source with VAC.
-    * On second thought, the needed function could probably
-    * be gotten from the OS/2 GNU library source, but the
-    * point is now moot.
-    */
-   struct stat hinfo;
-    PRInt64 s, s2us;
-
-    _setmode(fd->secret->md.osfd, O_BINARY);
-    if(fstat((int)fd->secret->md.osfd, &hinfo) != NO_ERROR) {
-		_PR_MD_MAP_FSTAT_ERROR(errno);
-        return -1;
-	}
-
-    if (hinfo.st_mode & S_IFDIR)
-        info->type = PR_FILE_DIRECTORY;
-    else
-        info->type = PR_FILE_FILE;
-
-    info->size = hinfo.st_size;
-    LL_I2L(s2us, PR_USEC_PER_SEC);
-    LL_I2L(s, hinfo.st_mtime);
-    LL_MUL(s, s, s2us);
-    info->modifyTime = s;
-    LL_I2L(s, hinfo.st_ctime);
-    LL_MUL(s, s, s2us);
-    info->creationTime = s;
-
-    return 0;
-}
-
-PRInt32
-_PR_MD_GETOPENFILEINFO64(const PRFileDesc *fd, PRFileInfo64 *info)
-{
-    PRFileInfo info32;
-    PRInt32 rv = _PR_MD_GETOPENFILEINFO(fd, &info32);
-    if (0 == rv)
-    {
-       info->type = info32.type;
-       LL_UI2L(info->size,info32.size);
-    
-       info->modifyTime = info32.modifyTime;
-       info->creationTime = info32.creationTime;
+    PRFileInfo64 info64;
+    PRInt32 rv = _PR_MD_GETOPENFILEINFO64(fd, &info64);
+    if (rv == -1)  {
+        return rv;
     }
-    
-    if (isWSEB)
-    {
-        APIRET rc ;
-        FILESTATUS3L fstatus;
 
-        rc = DosQueryFileInfo(fd->secret->md.osfd, FIL_STANDARDL, &fstatus, sizeof(fstatus));
-
-        if (NO_ERROR != rc)
-        {
-            _PR_MD_MAP_OPEN_ERROR(rc);
-            return -1;
-        }
-
-        if (! (fstatus.attrFile & FILE_DIRECTORY))
-        {
-            info->size = fstatus.cbFile;
-        }
+    if (info) {
+        info->type = info64.type;
+        info->size = info64.size;
+        info->modifyTime = info64.modifyTime;
+        info->creationTime = info64.creationTime;
     }
 
     return rv;
 }
 
-
 PRInt32
 _PR_MD_RENAME(const char *from, const char *to)
 {
-   PRInt32 rc;
-    /* Does this work with dot-relative pathnames? */
-    if ( (rc = DosMove((char *)from, (char *)to)) == NO_ERROR) {
-        return 0;
-    } else {
-		_PR_MD_MAP_RENAME_ERROR(rc);
-        return -1;
-    }
+   PRInt32 rv;
+
+   rv = rename(from, to);
+   if (rv == -1) {
+       _PR_MD_MAP_RENAME_ERROR(_MD_ERRNO());
+   }
+
+   return rv;
 }
 
 PRInt32
 _PR_MD_ACCESS(const char *name, PRAccessHow how)
 {
-  PRInt32 rv;
+    PRInt32 rv;
+    int amode;
+
     switch (how) {
-      case PR_ACCESS_WRITE_OK:
-        rv = access(name, 02);
-		break;
-      case PR_ACCESS_READ_OK:
-        rv = access(name, 04);
-		break;
-      case PR_ACCESS_EXISTS:
-        return access(name, 00);
-	  	break;
-      default:
-		PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
-		return -1;
+        case PR_ACCESS_WRITE_OK:
+            amode = W_OK;
+            break;
+        case PR_ACCESS_READ_OK:
+            amode = R_OK;
+            break;
+        case PR_ACCESS_EXISTS:
+            amode = F_OK;
+            break;
+        default:
+            PR_SetError(PR_INVALID_ARGUMENT_ERROR, 0);
+            return -1;
     }
-	if (rv < 0)
-		_PR_MD_MAP_ACCESS_ERROR(errno);
+    rv = access(name, amode);
+
+    if (rv < 0)
+        _PR_MD_MAP_ACCESS_ERROR(_MD_ERRNO());
+
     return rv;
 }
 
 PRInt32
 _PR_MD_MKDIR(const char *name, PRIntn mode)
 {
-   PRInt32 rc;
-    /* XXXMB - how to translate the "mode"??? */
-    if ((rc = DosCreateDir((char *)name, NULL))== NO_ERROR) {
-        return 0;
-    } else {
-		_PR_MD_MAP_MKDIR_ERROR(rc);
-        return -1;
+    PRInt32 rv;
+
+    rv = mkdir(name, mode);
+    if (rv < 0) {
+        _PR_MD_MAP_MKDIR_ERROR(_MD_ERRNO());
     }
+
+    return rv;
 }
 
 PRInt32
 _PR_MD_RMDIR(const char *name)
 {
-   PRInt32 rc;
-    if ( (rc = DosDeleteDir((char *)name)) == NO_ERROR) {
-        return 0;
-    } else {
-		_PR_MD_MAP_RMDIR_ERROR(rc);
-        return -1;
+    PRInt32 rv;
+
+    rv = rmdir(name);
+    if (rv < 0) {
+        _PR_MD_MAP_RMDIR_ERROR(_MD_ERRNO());
     }
+
+    return rv;
 }
+
+/*
+ * NOTE: Under kLIBC 0.6.6 and around, NSPR must be linked against LIBCx in
+ * order for the fcntl locking code to work correctly.
+ */
 
 PRStatus
 _PR_MD_LOCKFILE(PRInt32 f)
 {
-    PRInt32   rv;
-    FILELOCK lock, unlock;
-    FILELOCKL lockL, unlockL;
-    
-    lock.lOffset = 0;
-    lockL.lOffset = 0;
-    lock.lRange = 0xffffffff;
-    lockL.lRange =  0xffffffffffffffff;
-    unlock.lOffset = 0;
-    unlock.lRange = 0;
-    unlockL.lOffset = 0;
-    unlockL.lRange = 0;
+    PRInt32 rv;
+    struct flock arg;
 
-    /*
-     * loop trying to DosSetFileLocks(),
-     * pause for a few miliseconds when can't get the lock
-     * and try again
-     */
-    for( rv = FALSE; rv == FALSE; /* do nothing */ )
-    {
-        if (isWSEB)
-        {
-	    rv = myDosSetFileLocksL( (HFILE) f,
-			                    &unlockL, &lockL,
-			                    0, 0);
-        }
-        else
-        {
-	    rv = DosSetFileLocks( (HFILE) f,
-			                    &unlock, &lock,
-			                    0, 0);
-        }
-		if ( rv != NO_ERROR )
-        {
-            DosSleep( 50 );  /* Sleep() a few milisecs and try again. */
-        }            
-    } /* end for() */
-    return PR_SUCCESS;
-} /* end _PR_MD_LOCKFILE() */
+    arg.l_type = F_WRLCK;
+    arg.l_whence = SEEK_SET;
+    arg.l_start = 0;
+    arg.l_len = 0;  /* until EOF */
+    rv = fcntl(f, F_SETLKW, &arg);
+    if (rv == 0)
+        return PR_SUCCESS;
+    _PR_MD_MAP_LOCKF_ERROR(_MD_ERRNO());
+    return PR_FAILURE;
+}
 
 PRStatus
 _PR_MD_TLOCKFILE(PRInt32 f)
 {
-    return _PR_MD_LOCKFILE(f);
-} /* end _PR_MD_TLOCKFILE() */
+    PRInt32 rv;
+    struct flock arg;
 
+    arg.l_type = F_WRLCK;
+    arg.l_whence = SEEK_SET;
+    arg.l_start = 0;
+    arg.l_len = 0;  /* until EOF */
+    rv = fcntl(f, F_SETLK, &arg);
+    if (rv == 0)
+        return PR_SUCCESS;
+    _PR_MD_MAP_LOCKF_ERROR(_MD_ERRNO());
+    return PR_FAILURE;
+}
 
 PRStatus
 _PR_MD_UNLOCKFILE(PRInt32 f)
 {
-    PRInt32   rv;
-    FILELOCK lock, unlock;
-    FILELOCKL lockL, unlockL;
-    
-    lock.lOffset = 0;
-    lockL.lOffset = 0;
-    lock.lRange = 0;
-    lockL.lRange = 0;
-    unlock.lOffset = 0;
-    unlockL.lOffset = 0;
-    unlock.lRange = 0xffffffff;
-    unlockL.lRange = 0xffffffffffffffff;
-    
-    if (isWSEB)
-    {
-        rv = myDosSetFileLocksL( (HFILE) f,
-                                        &unlockL, &lockL,
-                                        0, 0);
-    }
-    else
-    {
-        rv = DosSetFileLocks( (HFILE) f,
-                                    &unlock, &lock,
-                                    0, 0);
-    }
-            
-    if ( rv != NO_ERROR )
-    {
+    PRInt32 rv;
+    struct flock arg;
+
+    arg.l_type = F_UNLCK;
+    arg.l_whence = SEEK_SET;
+    arg.l_start = 0;
+    arg.l_len = 0;  /* until EOF */
+    rv = fcntl(f, F_SETLK, &arg);
+    if (rv == 0)
         return PR_SUCCESS;
-    }
-    else
-    {
-        return PR_FAILURE;
-    }
-} /* end _PR_MD_UNLOCKFILE() */
+    _PR_MD_MAP_LOCKF_ERROR(_MD_ERRNO());
+    return PR_FAILURE;
+}
 
 PRStatus
 _PR_MD_SET_FD_INHERITABLE(PRFileDesc *fd, PRBool inheritable)
 {
-    APIRET rc = 0;
-    ULONG flags;
-    switch (fd->methods->file_type)
-    {
-        case PR_DESC_PIPE:
-        case PR_DESC_FILE:
-            rc = DosQueryFHState((HFILE)fd->secret->md.osfd, &flags);
-            if (rc != NO_ERROR) {
-                PR_SetError(PR_UNKNOWN_ERROR, _MD_ERRNO());
-                return PR_FAILURE;
-            }
+    PRInt32 rv;
 
-            if (inheritable)
-              flags &= ~OPEN_FLAGS_NOINHERIT;
-            else
-              flags |= OPEN_FLAGS_NOINHERIT;
-
-            /* Mask off flags DosSetFHState don't want. */
-            flags &= (OPEN_FLAGS_WRITE_THROUGH | OPEN_FLAGS_FAIL_ON_ERROR | OPEN_FLAGS_NO_CACHE | OPEN_FLAGS_NOINHERIT);
-            rc = DosSetFHState((HFILE)fd->secret->md.osfd, flags);
-            if (rc != NO_ERROR) {
-                PR_SetError(PR_UNKNOWN_ERROR, _MD_ERRNO());
-                return PR_FAILURE;
-            }
-            break;
-
-        case PR_DESC_LAYERED:
-            /* what to do here? */
-            PR_SetError(PR_UNKNOWN_ERROR, 87 /*ERROR_INVALID_PARAMETER*/);
-            return PR_FAILURE;
-
-        case PR_DESC_SOCKET_TCP:
-        case PR_DESC_SOCKET_UDP:
-            /* These are global on OS/2. */
-            break;
+    rv = fcntl(fd->secret->md.osfd, F_SETFD, inheritable ? 0 : FD_CLOEXEC);
+    if (-1 == rv) {
+        PR_SetError(PR_UNKNOWN_ERROR, _MD_ERRNO());
+        return PR_FAILURE;
     }
-
     return PR_SUCCESS;
 }
 
 void
 _PR_MD_INIT_FD_INHERITABLE(PRFileDesc *fd, PRBool imported)
 {
-    /* XXX this function needs to be implemented */
-    fd->secret->inheritable = _PR_TRI_UNKNOWN;
+    if (imported) {
+        fd->secret->inheritable = _PR_TRI_UNKNOWN;
+    } else {
+        /* By default, an OS/2 fd is not closed on exec. */
+#ifdef DEBUG
+        {
+            int flags = fcntl(fd->secret->md.osfd, F_GETFD, 0);
+            PR_ASSERT(0 == flags);
+        }
+#endif
+        fd->secret->inheritable = _PR_TRI_TRUE;
+    }
 }
 
 void
 _PR_MD_QUERY_FD_INHERITABLE(PRFileDesc *fd)
 {
-    /* XXX this function needs to be reviewed */
-    ULONG flags;
+    int flags;
 
     PR_ASSERT(_PR_TRI_UNKNOWN == fd->secret->inheritable);
-    if (DosQueryFHState((HFILE)fd->secret->md.osfd, &flags) == 0) {
-        if (flags & OPEN_FLAGS_NOINHERIT) {
-            fd->secret->inheritable = _PR_TRI_FALSE;
-        } else {
-            fd->secret->inheritable = _PR_TRI_TRUE;
-        }
-    }
+    flags = fcntl(fd->secret->md.osfd, F_GETFD, 0);
+    PR_ASSERT(-1 != flags);
+    fd->secret->inheritable = (flags & FD_CLOEXEC) ?
+        _PR_TRI_FALSE : _PR_TRI_TRUE;
 }
