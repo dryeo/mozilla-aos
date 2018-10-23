@@ -112,7 +112,7 @@ set_config('L10NBASEDIR', l10n_base)
 # reason.
 option('--enable-default-toolkit', nargs=1,
        choices=('cairo-windows', 'cairo-gtk2', 'cairo-gtk2-x11', 'cairo-gtk3',
-                'cairo-cocoa', 'cairo-uikit', 'cairo-android',
+                'cairo-cocoa', 'cairo-uikit', 'cairo-android', 'cairo-os2',
                 'cairo-gonk'),
        help='Select default toolkit')
 
@@ -134,6 +134,8 @@ def toolkit(value, target):
             platform_choices = tuple(value)
         else:
             platform_choices = ('cairo-android',)
+    elif target.os == 'OS2':
+        platform_choices = ('cairo-os2',)
     else:
         platform_choices = ('cairo-gtk3', 'cairo-gtk2', 'cairo-gtk2-x11')
 
@@ -232,7 +234,7 @@ set_define(gl_provider_define, True)
 # ==============================================================
 @depends(toolkit)
 def pdf_printing(toolkit):
-    if toolkit in ('windows', 'gtk2', 'gtk3', 'android', 'gonk'):
+    if toolkit in ('windows', 'gtk2', 'gtk3', 'android', 'os2', 'gonk'):
         return True
 
 @depends(pdf_printing)
@@ -255,7 +257,7 @@ option(env='MOZ_INSTRUMENT_EVENT_LOOP',
 @depends('MOZ_INSTRUMENT_EVENT_LOOP', toolkit)
 def instrument_event_loop(value, toolkit):
     if value or (toolkit in ('windows', 'gtk2', 'gtk3', 'cocoa', 'android',
-                             'gonk') and value.origin == 'default'):
+                             'os2', 'gonk') and value.origin == 'default'):
         return True
 
 set_config('MOZ_INSTRUMENT_EVENT_LOOP', instrument_event_loop)
