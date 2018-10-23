@@ -3230,7 +3230,7 @@ dnl ========================================================
 
 dnl If using Desktop Linux, ensure that the PA library is available
 case "$OS_TARGET" in
-WINNT|Darwin|Android|OpenBSD)
+WINNT|Darwin|Android|OpenBSD|OS2)
     ;;
 *)
     MOZ_PULSEAUDIO=1
