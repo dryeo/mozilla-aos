@@ -189,6 +189,7 @@ def old_configure_options(*options):
     '--enable-ios-target',
     '--enable-jitspew',
     '--enable-libjpeg-turbo',
+    '--enable-libkai',
     '--enable-libproxy',
     '--enable-llvm-hacks',
     '--enable-logrefcnt',

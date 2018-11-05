@@ -3139,45 +3139,21 @@ if test -n "$MOZ_OMX_PLUGIN"; then
 fi
 
 dnl ========================================================
-dnl = libkai support
+dnl = Check libkai availability on OS/2
 dnl ========================================================
 
-if test "$OS_TARGET" = "OS2"; then
-  dnl Enable libkai support on OS/2 by default
-  MOZ_LIBKAI=1
-fi
-
-MOZ_LIBKAI_CFLAGS=
-MOZ_LIBKAI_LIBS=
-
-MOZ_ARG_DISABLE_BOOL(libkai,
-[  --disable-libkai        Disable support for libkai],
-    MOZ_LIBKAI=,
-    MOZ_LIBKAI=1)
-
-MOZ_ARG_WITH_STRING(libkai,
-[  --with-libkai=DIR       Location of libkai dir],
-    libkaidir=$withval)
+MOZ_ARG_ENABLE_BOOL(alsa,
+[  --enable-libkai          Enable libkai support],
+   MOZ_LIBKAI=1,
+   MOZ_LIBKAI=)
 
 if test -n "$MOZ_LIBKAI"; then
-  AC_DEFINE(MOZ_LIBKAI)
-  if test -n "$libkaidir"; then
-    MOZ_LIBKAI_CFLAGS="-I$libkaidir/include"
-    MOZ_LIBKAI_LIBS="-L$libkaidir/lib -lkai"
-  else
-    dnl Assume libkai is available in system directories
-    dnl TODO use pkg-config later
-    MOZ_LIBKAI_LIBS="-lkai"
-  fi
-else
-  if test -n "$libkaidir"; then
-    AC_MSG_ERROR([--with-libkai makes no sense with --disable-libkai])
-  fi
+    PKG_CHECK_MODULES(MOZ_LIBKAI, alsa, ,
+         [echo "$MOZ_LIBKAI_PKG_ERRORS"
+          AC_MSG_ERROR([Need libkai for audio output on OS/2.)])])
 fi
 
 AC_SUBST(MOZ_LIBKAI)
-AC_SUBST_LIST(MOZ_LIBKAI_CFLAGS)
-AC_SUBST_LIST(MOZ_LIBKAI_LIBS)
 
 dnl system libvpx Support
 dnl ========================================================
