@@ -586,6 +586,14 @@ case "$host" in
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O3}"
     ;;
 
+*os2*)
+    HOST_CFLAGS="$HOST_CFLAGS -DXP_OS2 -DNO_X11 -Zomf"
+    HOST_NSPR_MDCPUCFG='\"md/_os2.cfg\"'
+    HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O2}"
+    HOST_BIN_SUFFIX=.exe
+    MOZ_FIX_LINK_PATHS=
+    ;;
+
 *)
     HOST_CFLAGS="$HOST_CFLAGS -DXP_UNIX"
     HOST_OPTIMIZE_FLAGS="${HOST_OPTIMIZE_FLAGS=-O2}"
@@ -931,6 +939,69 @@ case "$target" in
     fi
     ;;
 
+*-os2*)
+    MKSHLIB='$(CXX) $(CXXFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
+    MKCSHLIB='$(CC) $(CFLAGS) $(DSO_PIC_CFLAGS) $(DSO_LDOPTS) -o $@'
+    AC_DEFINE(OS2)
+    AC_DEFINE(XP_OS2)
+    AC_DEFINE(OS2EMX_PLAIN_CHAR)
+    OBJ_SUFFIX=obj
+    DLL_PREFIX=
+    LIB_PREFIX=
+    LIB_SUFFIX=lib
+    BIN_SUFFIX=".exe"
+    DLL_SUFFIX=".dll"
+    IMPORT_LIB_SUFFIX=lib
+    DSO_PIC_CFLAGS=
+    AR=emxomfar
+    AR_FLAGS='r $@'
+    CFLAGS="$CFLAGS -Zomf"
+    CXXFLAGS="$CXXFLAGS -Zomf"
+    DSO_LDOPTS='-Zdll'
+    BIN_FLAGS='-Zlinker /ST:0x100000'
+    IMPLIB='emximp -o'
+    FILTER='true'
+    LDFLAGS="$LDFLAGS -Zomf -Zmap"
+    if test "$EMXOMFLD_TYPE" = "WLINK" -o "$EMXOMFLD_TYPE" = "wlink"; then
+        LDFLAGS="$LDFLAGS -Zlinker DISABLE\ 1121"
+    fi
+    # Deliberately disable SSE/SSE2 (GCC/2 bug, see https://github.com/psmedley/gcc/issues/28)
+    MOZ_OPTIMIZE_FLAGS="-O3 -march=pentium-m -mstackrealign"
+    if test "$EMXOMFLD_TYPE" = "WLINK" -o "$EMXOMFLD_TYPE" = "wlink"; then
+        MOZ_OPTIMIZE_LDFLAGS=
+    else
+        MOZ_OPTIMIZE_LDFLAGS="-Zlinker /EXEPACK:2 -Zlinker /PACKCODE -Zlinker /PACKDATA"
+    fi
+    TARGET_MD_ARCH=os2
+#    _PLATFORM_DEFAULT_TOOLKIT="cairo-os2"
+    RC=rc.exe
+    MC=mc.exe
+    RCFLAGS='-n'
+    MOZ_USER_DIR="Mozilla"
+    MOZ_COMPONENT_NSPR_LIBS='$(NSPR_LIBS)'
+
+    if test -n "$MOZ_OS2_HIGH_MEMORY"; then
+        DSO_LDOPTS="$DSO_LDOPTS -Zhigh-mem"
+        LDFLAGS="$LDFLAGS -Zhigh-mem"
+        MOZ_OPTIMIZE_LDFLAGS="$MOZ_OPTIMIZE_LDFLAGS -Zhigh-mem"
+        AC_DEFINE(MOZ_OS2_HIGH_MEMORY)
+    fi
+
+    # GCC for OS/2 currently predefines these, but we don't want them
+    _DEFINES_CFLAGS="$_DEFINES_CFLAGS -Uunix -U__unix -U__unix__"
+    _DEFINES_CXXFLAGS="$_DEFINES_CXXFLAGS -Uunix -U__unix -U__unix__"
+
+    AC_CACHE_CHECK(for __declspec(dllexport),
+        ac_os2_declspec,
+        [AC_TRY_COMPILE([__declspec(dllexport) void ac_os2_declspec(void) {}],
+                        [return 0;],
+                        ac_os2_declspec="yes",
+                        ac_os2_declspec="no")])
+    if test "$ac_os2_declspec" != "yes"; then
+        AC_MSG_ERROR([Compiler does not support __declspec(dllexport), install GCC-4.3.2 or newer])
+    fi
+    ;;
+
 esac
 
 dnl Only one oddball right now (QNX), but this gives us flexibility
@@ -1056,6 +1127,8 @@ dnl against libSystem causes issues when debugging (see bug 299601).
 case $target in
 *-darwin*)
     ;;
+*-os2*)
+    ;;
 *)
     AC_SEARCH_LIBS(dlopen, dl,
         MOZ_CHECK_HEADER(dlfcn.h,
@@ -1066,6 +1139,13 @@ esac
 if test ! "$GNU_CXX"; then
     AC_CHECK_LIB(C, demangle)
 fi
+
+dnl OS/2 has socket in libc.
+case $target in
+*-os2*)
+    ;;
+*)
+esac
 
 AC_CHECK_LIB(socket, socket)
 
