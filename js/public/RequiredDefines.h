@@ -24,9 +24,15 @@
  * and with __STDC_FORMAT_MACROS for the format macros (PRId32 for example) used
  * with the fprintf function family.
  */
+#if !defined (__STDC_LIMIT_MACROS)
 #define __STDC_LIMIT_MACROS
+#endif
+#if !defined (__STDC_CONSTANT_MACROS)
 #define __STDC_CONSTANT_MACROS
+#endif
+#if !defined(__STDC_FORMAT_MACROS)
 #define __STDC_FORMAT_MACROS
+#endif
 
 /* Also define a char16_t type if not provided by the compiler. */
 #include "mozilla/Char16.h"
