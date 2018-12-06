@@ -49,6 +49,10 @@
 #include <windows.h>
 #endif // defined (XP_WIN)
 
+#if defined(XP_OS2)
+#include <errno.h>
+#endif
+
 namespace mozilla {
 
 MOZ_TYPE_SPECIFIC_SCOPED_POINTER_TEMPLATE(ScopedPRFileDesc, PRFileDesc, PR_Close)
