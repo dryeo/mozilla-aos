@@ -152,17 +152,7 @@ nsBIG5ToUnicode::GetMaxLength(const char* aSrc,
 {
   // The length of the output in UTF-16 code units never exceeds the length
   // of the input in bytes.
-  mozilla::CheckedInt32 length = aSrcLength;
-  if (mPendingTrail) {
-    length += 1;
-  }
-  if (mBig5Lead) {
-    length += 1;
-  }
-  if (!length.isValid()) {
-    return NS_ERROR_OUT_OF_MEMORY;
-  }
-  *aDestLength = length.value();
+  *aDestLength = aSrcLength + (mPendingTrail ? 1 : 0) + (mBig5Lead ? 1 : 0);
   return NS_OK;
 }
 
