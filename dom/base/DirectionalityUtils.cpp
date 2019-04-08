@@ -209,7 +209,6 @@
 #include "nsINode.h"
 #include "nsIContent.h"
 #include "nsIDocument.h"
-#include "mozilla/AutoRestore.h"
 #include "mozilla/DebugOnly.h"
 #include "mozilla/dom/Element.h"
 #include "nsIDOMHTMLDocument.h"
@@ -436,13 +435,12 @@ class nsTextNodeDirectionalityMap
 
     nsTextNodeDirectionalityMap* map =
       reinterpret_cast<nsTextNodeDirectionalityMap * >(aPropertyValue);
-    map->EnsureMapIsClear();
+    map->EnsureMapIsClear(textNode);
     delete map;
   }
 
 public:
   explicit nsTextNodeDirectionalityMap(nsINode* aTextNode)
-    : mElementToBeRemoved(nullptr)
   {
     MOZ_ASSERT(aTextNode, "Null text node");
     MOZ_COUNT_CTOR(nsTextNodeDirectionalityMap);
@@ -456,28 +454,11 @@ public:
     MOZ_COUNT_DTOR(nsTextNodeDirectionalityMap);
   }
 
-  static void
-  nsTextNodeDirectionalityMapPropertyDestructor(void* aObject,
-                                                nsIAtom* aProperty,
-                                                void* aPropertyValue,
-                                                void* aData)
-  {
-    nsTextNode* textNode =
-      static_cast<nsTextNode*>(aPropertyValue);
-    nsTextNodeDirectionalityMap* map = GetDirectionalityMap(textNode);
-    if (map) {
-      map->RemoveEntryForProperty(static_cast<Element*>(aObject));
-    }
-    NS_RELEASE(textNode);
-  }
-
   void AddEntry(nsINode* aTextNode, Element* aElement)
   {
     if (!mElements.Contains(aElement)) {
       mElements.Put(aElement);
-      NS_ADDREF(aTextNode);
-      aElement->SetProperty(nsGkAtoms::dirAutoSetBy, aTextNode,
-                            nsTextNodeDirectionalityMapPropertyDestructor);
+      aElement->SetProperty(nsGkAtoms::dirAutoSetBy, aTextNode);
       aElement->SetHasDirAutoSet();
     }
   }
@@ -489,21 +470,11 @@ public:
 
     mElements.Remove(aElement);
     aElement->ClearHasDirAutoSet();
-    aElement->DeleteProperty(nsGkAtoms::dirAutoSetBy);
-  }
-
-  void RemoveEntryForProperty(Element* aElement)
-  {
-    if (mElementToBeRemoved != aElement) {
-      mElements.Remove(aElement);
-    }
-    aElement->ClearHasDirAutoSet();
+    aElement->UnsetProperty(nsGkAtoms::dirAutoSetBy);
   }
 
 private:
-  nsCheapSet<nsPtrHashKey<Element>> mElements;
-  // Only used for comparison.
-  Element* mElementToBeRemoved;
+  nsCheapSet<nsPtrHashKey<Element> > mElements;
 
   static nsTextNodeDirectionalityMap* GetDirectionalityMap(nsINode* aTextNode)
   {
@@ -527,29 +498,18 @@ private:
     return OpNext;
   }
 
-  struct nsTextNodeDirectionalityMapAndElement
-  {
-    nsTextNodeDirectionalityMap* mMap;
-    nsCOMPtr<nsINode> mNode;
-  };
-
   static nsCheapSetOperator ResetNodeDirection(nsPtrHashKey<Element>* aEntry, void* aData)
   {
     MOZ_ASSERT(aEntry->GetKey()->IsElement(), "Must be an Element");
     // run the downward propagation algorithm
     // and remove the text node from the map
-    nsTextNodeDirectionalityMapAndElement* data =
-      static_cast<nsTextNodeDirectionalityMapAndElement*>(aData);
-    nsINode* oldTextNode = data->mNode;
+    nsINode* oldTextNode = static_cast<Element*>(aData);
     Element* rootNode = aEntry->GetKey();
     nsINode* newTextNode = nullptr;
     if (rootNode->GetParentNode() && rootNode->HasDirAuto()) {
       newTextNode = WalkDescendantsSetDirectionFromText(rootNode, true,
                                                         oldTextNode);
     }
-
-    AutoRestore<Element*> restore(data->mMap->mElementToBeRemoved);
-    data->mMap->mElementToBeRemoved = rootNode;
     if (newTextNode) {
       nsINode* oldDirAutoSetBy = 
         static_cast<nsTextNode*>(rootNode->GetProperty(nsGkAtoms::dirAutoSetBy));
@@ -560,17 +520,16 @@ private:
       nsTextNodeDirectionalityMap::AddEntryToMap(newTextNode, rootNode);
     } else {
       rootNode->ClearHasDirAutoSet();
-      rootNode->DeleteProperty(nsGkAtoms::dirAutoSetBy);
+      rootNode->UnsetProperty(nsGkAtoms::dirAutoSetBy);
     }
     return OpRemove;
   }
 
-  static nsCheapSetOperator TakeEntries(nsPtrHashKey<Element>* aEntry, void* aData)
+  static nsCheapSetOperator ClearEntry(nsPtrHashKey<Element>* aEntry, void* aData)
   {
-    // TenFourFox lacks AutoTArray, so convert bug 1414452 to nsAutoTArray.
-    nsAutoTArray<Element*, 8>* entries =
-      static_cast<nsAutoTArray<Element*, 8>*>(aData);
-    entries->AppendElement(aEntry->GetKey());
+    Element* rootNode = aEntry->GetKey();
+    rootNode->ClearHasDirAutoSet();
+    rootNode->UnsetProperty(nsGkAtoms::dirAutoSetBy);
     return OpRemove;
   }
 
@@ -582,22 +541,14 @@ public:
 
   void ResetAutoDirection(nsINode* aTextNode)
   {
-    nsTextNodeDirectionalityMapAndElement data = { this, aTextNode };
-    mElements.EnumerateEntries(ResetNodeDirection, &data);
+    mElements.EnumerateEntries(ResetNodeDirection, aTextNode);
   }
 
-  void EnsureMapIsClear()
+  void EnsureMapIsClear(nsINode* aTextNode)
   {
-    AutoRestore<Element*> restore(mElementToBeRemoved);
-    // As above.
-    nsAutoTArray<Element*, 8> entries;
-    mElements.EnumerateEntries(TakeEntries, &entries);
-    uint32_t size = entries.Length();
-    for(uint32_t i = 0; i < size; i++) {
-      Element* el = entries.ElementAt(i);
-      el->ClearHasDirAutoSet();
-      el->DeleteProperty(nsGkAtoms::dirAutoSetBy);
-    }
+    DebugOnly<uint32_t> clearedEntries =
+      mElements.EnumerateEntries(ClearEntry, aTextNode);
+    MOZ_ASSERT(clearedEntries == 0, "Map should be empty already");
   }
 
   static void RemoveElementFromMap(nsINode* aTextNode, Element* aElement)
@@ -630,14 +581,13 @@ public:
   {
     MOZ_ASSERT(aTextNode->HasTextNodeDirectionalityMap(),
                "Map missing in ResetTextNodeDirection");
-    RefPtr<nsTextNode> textNode = aTextNode;
-    GetDirectionalityMap(textNode)->ResetAutoDirection(aChangedTextNode);
+    GetDirectionalityMap(aTextNode)->ResetAutoDirection(aChangedTextNode);
   }
 
   static void EnsureMapIsClearFor(nsINode* aTextNode)
   {
     if (aTextNode->HasTextNodeDirectionalityMap()) {
-      GetDirectionalityMap(aTextNode)->EnsureMapIsClear();
+      GetDirectionalityMap(aTextNode)->EnsureMapIsClear(aTextNode);
     }
   }
 };
