@@ -84,6 +84,9 @@
 #else
 @BINPATH@/@DLL_PREFIX@xul@DLL_SUFFIX@
 #endif
+#ifdef XP_OS2
+@BINPATH@/@DLL_PREFIX@xul.xqs
+#endif
 #ifdef XP_MACOSX
 @BINPATH@/@MOZ_CHILD_PROCESS_NAME@.app/
 @BINPATH@/@DLL_PREFIX@plugin_child_interpose@DLL_SUFFIX@
@@ -133,6 +136,9 @@
 @BINPATH@/@MOZ_APP_NAME@-bin
 @BINPATH@/@MOZ_APP_NAME@
 #endif
+#ifdef XP_OS2
+@BINPATH@/@MOZ_APP_NAME@.xqs
+#endif
 @RESPATH@/application.ini
 #ifdef MOZ_UPDATER
 @RESPATH@/update-settings.ini
@@ -146,8 +152,12 @@
 #endif
 #else
 @BINPATH@/mozsqlt3@DLL_SUFFIX@
+@BINPATH@/mozsqlt3.xqs
 #endif
 @BINPATH@/@DLL_PREFIX@lgpllibs@DLL_SUFFIX@
+#ifdef XP_OS2
+@BINPATH@/@DLL_PREFIX@lgpllibs.xqs
+#endif
 @RESPATH@/browser/blocklist.xml
 #ifdef XP_UNIX
 #ifndef XP_MACOSX
@@ -454,6 +464,7 @@
 @RESPATH@/browser/components/@DLL_PREFIX@browsercomps@DLL_SUFFIX@
 #else
 @RESPATH@/browser/components/brwsrcmp@DLL_SUFFIX@
+@RESPATH@/browser/components/brwsrcmp.xqs
 #endif
 @RESPATH@/components/txEXSLTRegExFunctions.manifest
 @RESPATH@/components/txEXSLTRegExFunctions.js
