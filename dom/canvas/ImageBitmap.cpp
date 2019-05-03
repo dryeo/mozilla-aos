@@ -5,7 +5,6 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 #include "mozilla/dom/ImageBitmap.h"
-#include "mozilla/CheckedInt.h"
 #include "mozilla/dom/ImageBitmapBinding.h"
 #include "mozilla/dom/Promise.h"
 #include "mozilla/dom/StructuredCloneTags.h"
@@ -133,14 +132,10 @@ CropAndCopyDataSourceSurface(DataSourceSurface* aSurface, const IntRect& aCropRe
                                              + surfPortion.x * bytesPerPixel;
     uint8_t* dstBufferPtr = dstMap.GetData() + dest.y * dstMap.GetStride()
                                              + dest.x * bytesPerPixel;
-    CheckedInt<uint32_t> copiedBytesPerRaw =
-      CheckedInt<uint32_t>(surfPortion.width) * bytesPerPixel;
-    if (MOZ_UNLIKELY(!copiedBytesPerRaw.isValid())) {
-      return nullptr;
-    }
+    const uint32_t copiedBytesPerRaw = surfPortion.width * bytesPerPixel;
 
     for (int i = 0; i < surfPortion.height; ++i) {
-      memcpy(dstBufferPtr, srcBufferPtr, copiedBytesPerRaw.value());
+      memcpy(dstBufferPtr, srcBufferPtr, copiedBytesPerRaw);
       srcBufferPtr += srcMap.GetStride();
       dstBufferPtr += dstMap.GetStride();
     }

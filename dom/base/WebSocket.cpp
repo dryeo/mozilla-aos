@@ -10,7 +10,6 @@
 
 #include "jsapi.h"
 #include "jsfriendapi.h"
-#include "mozilla/CheckedInt.h"
 #include "mozilla/DOMEventTargetHelper.h"
 #include "mozilla/net/WebSocketChannel.h"
 #include "mozilla/dom/File.h"
@@ -611,10 +610,6 @@ WebSocketImpl::Disconnect()
 
   AssertIsOnTargetThread();
 
-  // DontKeepAliveAnyMore() and DisconnectInternal() can release the object. So
-  // hold a reference to this until the end of the method.
-  RefPtr<WebSocketImpl> kungfuDeathGrip = this;
-
   // Disconnect can be called from some control event (such as Notify() of
   // WorkerFeature). This will be schedulated before any other sync/async
   // runnable. In order to prevent some double Disconnect() calls, we use this
@@ -635,6 +630,10 @@ WebSocketImpl::Disconnect()
     // where to, exactly?
     rv.SuppressException();
   }
+
+  // DontKeepAliveAnyMore() can release the object. So hold a reference to this
+  // until the end of the method.
+  RefPtr<WebSocketImpl> kungfuDeathGrip = this;
 
   NS_ReleaseOnMainThread(mChannel);
   NS_ReleaseOnMainThread(static_cast<nsIWebSocketEventService*>(mService.forget().take()));
@@ -2381,14 +2380,7 @@ WebSocket::Send(nsIInputStream* aMsgStream,
   }
 
   // Always increment outgoing buffer len, even if closed
-  CheckedUint32 size = mOutgoingBufferedAmount;
-  size += aMsgLength;
-  if (MOZ_UNLIKELY(!size.isValid())) {
-    aRv.Throw(NS_ERROR_OUT_OF_MEMORY);
-    return;
-  }
-
-  mOutgoingBufferedAmount = size.value();
+  mOutgoingBufferedAmount += aMsgLength;
 
   if (readyState == CLOSING ||
       readyState == CLOSED) {
