@@ -11,6 +11,7 @@ libs::
 	$(INSTALL) $(srcdir)/MozSounds.cmd $(DIST)/bin/
 	$(INSTALL) $(srcdir)/README.OS2 $(DIST)/bin/
 	$(INSTALL) $(srcdir)/CHANGES.OS2 $(DIST)/bin/
+	$(INSTALL) $(srcdir)/RPM_REQUIREMENTS $(DIST)/bin/
 
 export-preqs = \
     $(call mkdir_deps,res) \
