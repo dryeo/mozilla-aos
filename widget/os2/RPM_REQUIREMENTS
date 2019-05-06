@@ -1,0 +1,27 @@
+<Note that most of these can be pentium 4 packages as well>
+
+bww-resources-rpm-1.1.0-3.oc00.noarch
+cairo-1.12.18-3.oc00.i686
+dash-sh-0.5.9.1-1.oc00.i686
+fontconfig-2.12.4-1.oc00.i686
+freetype-2.8.0-1.oc00.i686
+hunspell-1.6.2-1.oc00.i686
+libc-0.6.6-35.oc00.i686
+libc-devel-0.6.6-35.oc00.i686
+libcx-0.6.0-1.oc00.i686
+libgcc1-4.9.2.1-3.oc00.i686
+libicu-56.1-1.oc00.i686
+libjpeg-turbo-1.5.1-1.oc00.i686
+libkai-1.2.0-1.oc00.i686
+libpng-1.6.31-1.oc00.i686
+libstdc++6-4.9.2.1-3.oc00.i686
+libvpx-1.6.1-1.oc00.i686
+nspr-4.12.0-4.oc00.i686
+nss-3.23.0-4.oc00.i686
+nss-util-3.23.0-4.oc00.i686
+os2-base-0.0.0-17.oc00.i686
+os2-mpts-0.0.0-2.oc00.i386
+pango-1.28.4-2.oc00.i686
+pixman-0.32.8-3.oc00.i686
+pthread-20151229-21.oc00.i386
+zlib-1.2.11-2.oc00.i686
