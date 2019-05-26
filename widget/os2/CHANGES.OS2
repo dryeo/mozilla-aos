@@ -4,6 +4,16 @@ in the Mozilla product series from release to release.
 
 CHANGES
 
+Firefox 45.9.0-SUa2 (2019-05-20)
+  - Back out commit that caused trps in PLDHashtables
+    ( https://bitbucket.org/dryeo/dry-comm-esr31/issues/13/int-3-in-xuldll-sm-2429esr-20190410161744)
+  - Restore building with NSPR and NSS
+  - Update a bunch of certificates and pins to bring us to the end of ESR52 certificate wise,
+    courtesy of TenFourFox.
+
+Firefox 45.9.0-SUa1 (2019-04-10)
+  - Use GCC 5.5.0 for compiling
+  - Port a bunch of security fixes from TenFourFox
 
 Firefox 45.9.0 GA2 (2018-05-20)
 
