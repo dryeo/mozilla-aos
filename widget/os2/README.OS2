@@ -15,6 +15,13 @@
   most recent news, binary downloads and the issue system to report
   OS/2-specific bugs.
 
+* Currently development in the form of bug fixes and backporting security
+  fixes continues at https://bitbucket.org/dryeo/mozilla-os2/wiki/Home
+  for Firefox and at https://bitbucket.org/dryeo/dry-comm-esr31/wiki/Home
+  ports of SeaMonkey and Thunderbird may be found.
+  Note that most of this document that refers to Firefox 45.9, equally
+  refers to SeaMonkey 2.49ESR and Thunderbird 45.8ESR.
+
 * Community support for the Mozilla applications is available through
   the newsgroups 'mozilla.dev.ports.os2' or 'comp.os.os2.apps'.
   Messages posted to other forums may not be seen by the developers.
@@ -74,20 +81,10 @@ is no longer supported. The only supported way of installing all the
 requirements now is the YUM command line tool or the Arca Noae Package Manager
 application (ANPM), which is part of ArcaOS (an OS/2 and eComstation successor
 distribution by Arca Noae which you can obtain from http://arcanoae.com).
+While the Mozilla apps continue to be distributed as zip files, it is best
+to follow the following instructions on installing the prerequisites.
 
-Moreover, starting from the release of Firefox version 45.9.0 GA, a separate
-ZIP distribution of Firefox is no longer maintained. There are now two supported
-methods of installing Firefox:
-
-- From an RPM repository using YUM or ANPM (this method requires a valid ArcaOS
-  Software Subscription, visit http://arcanoae.com for details). This is the
-  preferred and the easiest way to install Firefox including all its
-  dependencies and to keep everything updated with a single mouse click.
-
-- From a ZIP archive automatically generated from the RPM distribution. See
-  below for details.
-
-The following instruction describe the steps necessary for both methods.
+The following instruction describe the steps necessary.
 
 1. Install the RPM/YUM environment. The simplest way to do so is to download
    and install ANPM as described here:
@@ -102,12 +99,7 @@ The following instruction describe the steps necessary for both methods.
    Note that you should skip this step if you already have ArcaOS installed,
    because it already includes the RPM/YUM environment and the ANPM tool.
 
-2. If you have an ArcaOS subscription, then simply install a package named
-   `firefox` using the ANPM GUI or by executing `yum install firefox` from the
-   command line. All Firefox dependencies will be downloaded and installed
-   (or updated) automatically.
-
-   If you use a ZIP archive, you may unpack its contents to a directory of your
+2. Using a ZIP archive, you may unpack its contents to a directory of your
    choice. Numerous Firefox dependencies are not installed in this case, so
    you will have to install them manually using ANPM or `yum install PACKAGES`
    followed by a `yum update`. The list of RPM packages required by Firefox is
@@ -231,6 +223,7 @@ Note:  Starting with Firefox 45.9.0 GA, it is not necessary to set LIBPATHSTRICT
     If the app crashes, Exceptq will beep and then create an exception
     report containing details of the crash.  You can send these reports
     to the developers via Issue Tracker reports (see the Links section).
+    Install with ANPM or YUM or go to
         http://home.earthlink.net/~steve53/betas/
 
 * ConfigApps & Internet Application Integration - Set Default Browser
@@ -247,6 +240,18 @@ Note:  Starting with Firefox 45.9.0 GA, it is not necessary to set LIBPATHSTRICT
     allows it to suspend reloads of "Live Bookmarks" and perform cleanup
     operations during idle periods rather than while you're browsing.
         ftp://ftp.netlabs.org/pub/dssaver/
+
+* Highmem - A program to mark DLLs to load into high (above 1GB) memory.
+    Yum install highmem or use ANPM to install.
+    Run like highmem.exe -c *dll in your program directory. Some DLLs may
+    need the readonly attribute removed.
+
+* Mozturbo - A dll preloader, including a script to automate running
+    highmem.exe.
+    As the OS/2 kernel has a bug where DLLs memory when loaded high is
+    not released when the program is closed, the turbo programs keep
+    the DLLs loaded in memory, making the system much more stable.
+    https://bitbucket.org/dryeo/mozturbo/downloads/
 
 
 ===============================================================================
@@ -536,8 +541,10 @@ posted to other forums may not be seen by the developers.
 * Cross-platform problems are usually listed in the release notes of each
   milestone release.
 
-* Other known problems can be found by following this link:
+* Other known problems can be found by following these links:
      https://github.com/bitwiseworks/mozilla-os2/issues
+     https://bitbucket.org/dryeo/mozilla-os2/issues?status=new&status=open
+     https://bitbucket.org/dryeo/dry-comm-esr31/issues?status=new&status=open
 
 * The old list of bugs (for historical purposes, as it is mostly outdated)
   can be found by following the link "Current Open Warpzilla Bugs" on the
@@ -551,6 +558,9 @@ posted to other forums may not be seen by the developers.
 
 Main resources:
 
+* Legacy add-ons are now maintainted by the Thunderbird project,
+    https://addons.thunderbird.net/
+
 * Mozilla for OS/2 Home Page
     https://github.com/bitwiseworks/mozilla-os2/wiki
 
@@ -558,12 +568,15 @@ Main resources:
     https://github.com/bitwiseworks/mozilla-os2/releases
 
 * Mozilla for OS/2 Issue Tracker & Bug Reports
+    https://bitbucket.org/dryeo/mozilla-os2/issues?status=new&status=open
     https://github.com/bitwiseworks/mozilla-os2/issues
 
-Seamonkey and Thunderbird builds (not supported by bww bitwise works GmbH):
+Seamonkey and Thunderbird builds:
 
 * Comm-Central (SeaMonkey and Thunderbird) for OS/2
-    https://bitbucket.org/dryeo
+    https://bitbucket.org/dryeo/dry-comm-esr31/wiki/Home
+* Issue tracker, 
+    https://bitbucket.org/dryeo/dry-comm-esr31/issues?status=new&status=open
 
 Additional information:
 
@@ -630,12 +643,14 @@ Additional information:
          some features it needs are not implemented correctly in older
          MPTS versions and may cause crashes and data loss.
 
-  Convenience Pack 2 or eComStation 1.0 or later meet these requirements
-  out of the box.
+  ArcaOS, Convenience Pack 2 or eComStation 1.0 or later meet these
+  requirements out of the box.
 
 * Java
     Java versions earlier than 1.5 are *not* supported.  Neither the IBM
     nor Innotek versions of Java will work with this release.
+    Note all Java is currently not working and if a plugin is installed
+    the browser will not start.
 
 * Innotek Font Engine
     This is no longer needed or used by any of the Mozilla apps and it is
@@ -652,7 +667,7 @@ Additional information:
 -- Acknowledgements -----------------------------------------------------------
 ===============================================================================
 
-The Mozilla for OS/2 and OS/2 based systems project is currently supported and
+The Mozilla for OS/2 and OS/2 based systems project has been supported and
 maintained by the staff of bww bitwise works GmbH:
 
 - Dmitriy Kuminov (developer)
