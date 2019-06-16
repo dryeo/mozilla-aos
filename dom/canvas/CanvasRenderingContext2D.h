@@ -40,6 +40,7 @@ class SourceSurface;
 namespace dom {
 class HTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrImageBitmap;
 typedef HTMLImageElementOrHTMLCanvasElementOrHTMLVideoElementOrImageBitmap CanvasImageSource;
+class ImageBitmap;
 class ImageData;
 class StringOrCanvasGradientOrCanvasPattern;
 class OwningStringOrCanvasGradientOrCanvasPattern;
@@ -1072,6 +1073,16 @@ protected:
 
   friend struct CanvasBidiProcessor;
   friend class CanvasDrawObserver;
+  friend class ImageBitmap;
+
+  void SetWriteOnly();
+
+  bool IsWriteOnly() const
+  {
+    return mWriteOnly;
+  }
+
+  bool mWriteOnly;
 };
 
 } // namespace dom
