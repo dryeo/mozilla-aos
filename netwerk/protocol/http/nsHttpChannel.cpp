@@ -7067,7 +7067,7 @@ nsHttpChannel::AwaitingCacheCallbacks()
 }
 
 void
-nsHttpChannel::SetPushedStream(Http2PushedStream *stream)
+nsHttpChannel::SetPushedStream(Http2PushedStreamWrapper *stream)
 {
     MOZ_ASSERT(stream);
     MOZ_ASSERT(!mPushedStream);
@@ -7075,7 +7075,8 @@ nsHttpChannel::SetPushedStream(Http2PushedStream *stream)
 }
 
 nsresult
-nsHttpChannel::OnPush(const nsACString &url, Http2PushedStream *pushedStream)
+nsHttpChannel::OnPush(const nsACString &url,
+                      Http2PushedStreamWrapper *pushedStream)
 {
     MOZ_ASSERT(NS_IsMainThread());
     LOG(("nsHttpChannel::OnPush [this=%p]\n", this));
