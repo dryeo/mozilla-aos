@@ -6398,9 +6398,7 @@ nsContentUtils::FlushLayoutForTree(nsIDOMWindow* aWindow)
 
 void nsContentUtils::RemoveNewlines(nsString &aString)
 {
-  // strip CR/LF and null
-  static const char badChars[] = {'\r', '\n', 0};
-  aString.StripChars(badChars);
+  aString.StripCRLF();
 }
 
 void
