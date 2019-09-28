@@ -77,6 +77,8 @@ static void OutputDebugStringA(const char* msg) {
     OutputDebugStringW(wMsg);
     PR_Free(wMsg);
 }
+#elif defined(XP_OS2)
+#define OutputDebugStringA(x)
 #endif
 
 /* Macros used to reduce #ifdef pollution */

@@ -36,7 +36,7 @@ PRStatus
 _PR_MD_TIMED_WAIT_SEM(_MDSemaphore *md, PRIntervalTime ticks)
 {
     int rv;
-    rv = DosWaitEventSem(md->sem, PR_IntervalToMilliseconds(ticks));
+    rv = SafeWaitEventSem(md->sem, PR_IntervalToMilliseconds(ticks));
 
     if (rv == NO_ERROR)
         return PR_SUCCESS;

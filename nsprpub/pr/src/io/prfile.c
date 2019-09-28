@@ -384,7 +384,7 @@ PR_IMPLEMENT(PRInt32) PR_GetSysfdTableMax(void)
 #elif defined (WIN16)
     return FOPEN_MAX;
 #elif defined(XP_OS2)
-    ULONG ulReqCount = 0;
+    LONG ulReqCount = 0;
     ULONG ulCurMaxFH = 0;
     DosSetRelMaxFH(&ulReqCount, &ulCurMaxFH);
     return ulCurMaxFH;

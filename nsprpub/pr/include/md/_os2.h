@@ -9,10 +9,14 @@
 #ifndef NO_LONG_LONG
 #define INCL_LONGLONG
 #endif
+#ifdef __EMX__
+#define OS2EMX_PLAIN_CHAR
+#endif
 #define INCL_BASE
 #define INCL_PM
 #include <os2.h>
 #include <sys/select.h>
+#include <dirent.h>
 
 #include "prio.h"
 
@@ -91,14 +95,7 @@ struct _MDSegment {
 #undef PROFILE_LOCKS
 
 struct _MDDir {
-    HDIR           d_hdl;
-    union {
-        FILEFINDBUF3  small;
-        FILEFINDBUF3L large;
-    } d_entry;
-    PRBool           firstEntry;     /* Is this the entry returned
-                                      * by FindFirstFile()? */
-    PRUint32         magic;          /* for debugging */
+    DIR *d;
 };
 
 struct _MDCVar {
@@ -305,8 +302,8 @@ extern PRInt32 _MD_Accept(PRFileDesc *fd, PRNetAddr *raddr, PRUint32 *rlen,
 
 #define _MD_NEW_LOCK                  (_PR_MD_NEW_LOCK)
 #define _MD_FREE_LOCK(lock)           (DosCloseMutexSem((lock)->mutex))
-#define _MD_LOCK(lock)                (DosRequestMutexSem((lock)->mutex, SEM_INDEFINITE_WAIT))
-#define _MD_TEST_AND_LOCK(lock)       (DosRequestMutexSem((lock)->mutex, SEM_INDEFINITE_WAIT),0)
+#define _MD_LOCK(lock)                (SafeRequestMutexSem((lock)->mutex, SEM_INDEFINITE_WAIT))
+#define _MD_TEST_AND_LOCK(lock)       (SafeRequestMutexSem((lock)->mutex, SEM_INDEFINITE_WAIT),0)
 #define _MD_UNLOCK                    (_PR_MD_UNLOCK)
 
 /* --- lock and cv waiting --- */
@@ -490,6 +487,8 @@ typedef struct _CONTEXTRECORD {
 #endif
 
 extern APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD);
+extern ULONG (* APIENTRY SafeWaitEventSem)(HEV hev, ULONG ulTimeout);
+extern ULONG (* APIENTRY SafeRequestMutexSem)(HMTX hmtx, ULONG ulTimeout);
 
 /*
 #define _pr_tid            (((PTIB2)_getTIBvalue(offsetof(TIB, tib_ptib2)))->tib2_ultid)
@@ -502,7 +501,7 @@ extern APIRET (* APIENTRY QueryThreadContext)(TID, ULONG, PCONTEXTRECORD);
  */
 #define FreeLibrary(x) DosFreeModule((HMODULE)x)
 #define OutputDebugStringA(x)
-                               
+
 extern int _MD_os2_get_nonblocking_connect_error(int osfd);
 
 #endif /* nspr_os2_defs_h___ */

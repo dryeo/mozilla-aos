@@ -15,8 +15,8 @@ dnl ========================================================
 dnl = Defaults
 dnl ========================================================
 MOD_MAJOR_VERSION=4
-MOD_MINOR_VERSION=12
-MOD_PATCH_VERSION=0
+MOD_MINOR_VERSION=13
+MOD_PATCH_VERSION=1
 NSPR_MODNAME=nspr20
 _HAVE_PTHREADS=
 USE_PTHREADS=
@@ -2534,6 +2534,21 @@ case $target in
     ;;
 esac
 
+dnl On OS/2, fcntl based locking needs LIBCx with the fcntl override as the
+dnl one provided by kLIBC provides a very limited impelmentation that doesn't
+dnl support many things required by POSIX (e.g. overlapped locks).
+
+case $target in
+*-os2*)
+    _OS2_HAVE_LIBCX=
+    AC_CHECK_LIB(cx, fcntl, _OS2_HAVE_LIBCX=1)
+    if test -n "$_OS2_HAVE_LIBCX"; then
+        OS_LIBS="$OS_LIBS -lcx"
+    else
+        AC_MSG_ERROR([LIBCx library with fcntl override is not found])
+    fi
+    ;;
+esac
 
 dnl ========================================================
 dnl Check for system header files.

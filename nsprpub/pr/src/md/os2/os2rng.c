@@ -4,6 +4,9 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 
+#ifdef __EMX__
+#define OS2EMX_PLAIN_CHAR
+#endif
 #define INCL_BASE
 #define INCL_PM
 #include <os2.h>
