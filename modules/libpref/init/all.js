@@ -5322,3 +5322,8 @@ pref("dom.mozKillSwitch.enabled", false);
 pref("toolkit.pageThumbs.screenSizeDivisor", 7);
 pref("toolkit.pageThumbs.minWidth", 0);
 pref("toolkit.pageThumbs.minHeight", 0);
+// When a user cancels this number of authentication dialogs coming from
+// a single web page in a row, all following authentication dialogs will
+// be blocked (automatically canceled) for that page. The counter resets
+// when the page is reloaded. To turn this feature off, just set the limit to 0.
+pref("prompts.authentication_dialog_abuse_limit", 3);
