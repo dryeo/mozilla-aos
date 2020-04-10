@@ -12,10 +12,10 @@
 
 #include "base/logging.h"
 
-#ifdef OS_OS2
+// #ifdef OS_OS2
 // vswprintf is defined in string_util_os2.cc, read there for more details
-int vswprintf (wchar_t *buffer, size_t n, const wchar_t *format, va_list arg_ptr);
-#endif
+// int vswprintf (wchar_t *buffer, size_t n, const wchar_t *format, va_list arg_ptr);
+// #endif
 
 namespace base {
 

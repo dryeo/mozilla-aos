@@ -178,7 +178,7 @@
 #define _EVENT_HAVE_PUTENV 1
 
 /* Define to 1 if the system has the type `sa_family_t'. */
-/* #undef _EVENT_HAVE_SA_FAMILY_T */
+#define _EVENT_HAVE_SA_FAMILY_T 1
 
 /* Define to 1 if you have the `select' function. */
 #define _EVENT_HAVE_SELECT 1
@@ -253,7 +253,7 @@
 #define _EVENT_HAVE_STRUCT_SOCKADDR_IN_SIN_LEN 1
 
 /* Define to 1 if the system has the type `struct sockaddr_storage'. */
-/* #undef _EVENT_HAVE_STRUCT_SOCKADDR_STORAGE */
+#define _EVENT_HAVE_STRUCT_SOCKADDR_STORAGE 1
 
 /* Define to 1 if `ss_family' is a member of `struct sockaddr_storage'. */
 /* #undef _EVENT_HAVE_STRUCT_SOCKADDR_STORAGE_SS_FAMILY */

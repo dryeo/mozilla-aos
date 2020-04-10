@@ -173,7 +173,7 @@ if os_os2:
         'src/base/process_util_os2.cc',
         'src/base/rand_util_os2.cc',
         'src/base/shared_memory_os2.cc',
-        'src/base/string_util_os2.cc',
+#       'src/base/string_util_os2.cc',
         'src/base/sys_info_os2.cc',
         'src/base/time_posix.cc',
         'src/chrome/common/transport_dib_os2.cc',
