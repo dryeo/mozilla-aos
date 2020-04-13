@@ -13,7 +13,7 @@
 // obtained with this API; see TimeDuration::Resolution;
 //
 
-#include <sys/syscall.h>
+// #include <sys/syscall.h>
 #include <time.h>
 #include <unistd.h>
 #include <string.h>

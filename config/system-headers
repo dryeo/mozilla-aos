@@ -158,7 +158,6 @@ afxmt.h
 afxpriv.h
 afxtempl.h
 afxwin.h
-algorithm
 Aliases.h
 all.h
 alloca.h
@@ -314,7 +313,6 @@ camera/CameraParameters.h
 Carbon/Carbon.h
 CarbonEvents.h
 Carbon.h
-cassert
 c_asm.h
 cctype
 cderr.h
@@ -331,7 +329,6 @@ CFString.h
 CFURL.h
 CGAffineTransform.h
 CheckBox.h
-climits
 Clipboard.h
 cmplrs/stsupport.h
 Cocoa/Cocoa.h
@@ -362,9 +359,6 @@ crtdbg.h
 crt_externs.h
 crypt.h
 cstddef
-cstdio
-cstdlib
-cstring
 ctime
 ctype.h
 curl/curl.h
@@ -386,7 +380,6 @@ dbus/dbus-glib.h
 dbus/dbus-glib-lowlevel.h
 ddeml.h
 Debug.h
-deque
 dem.h
 descrip.h
 Devices.h
@@ -562,11 +555,7 @@ IOKit/IOKitLib.h
 IOKit/IOMessage.h
 IOKit/pwr_mgt/IOPMLib.h
 iomanip
-ios
-iosfwd
-iostream
 iostream.h
-iterator
 JavaControl.h
 JavaEmbedding/JavaControl.h
 JavaVM/jni.h
@@ -630,7 +619,6 @@ libgnomeui/gnome-icon-lookup.h
 libgnomeui/gnome-icon-theme.h
 libgnomeui/gnome-ui-init.h
 lib$routines.h
-limits
 limits.h
 link.h
 #ifdef ANDROID
@@ -642,7 +630,6 @@ linux/kernel.h
 linux/limits.h
 linux/rtc.h
 linux/version.h
-list
 List.h
 Lists.h
 LListBox.h
@@ -713,7 +700,6 @@ MacTypes.h
 MacWindows.h
 malloc.h
 malloc_np.h
-map
 mapicode.h
 mapidefs.h
 mapiguid.h
@@ -769,7 +755,6 @@ media/stagefright/openmax/OMX_Video.h
 media/stagefright/Utils.h
 #endif
 mem.h
-memory
 memory.h
 Memory.h
 MenuBar.h
@@ -797,7 +782,6 @@ net/if.h
 netinet/in.h
 netinet/in_systm.h
 netinet/tcp.h
-new
 newexe.h
 new.h
 nl_types.h
@@ -819,7 +803,6 @@ OpenTransport.h
 os2.h
 OS.h
 osreldate.h
-ostream
 OSUtils.h
 Packages.h
 Palettes.h
@@ -910,7 +893,6 @@ security.h
 secutil.h
 semaphore.h
 servprov.h
-set
 setjmp.h
 SFNTLayoutTypes.h
 SFNTTypes.h
@@ -982,7 +964,6 @@ stdio.h
 stdlib.h
 storage/FindDirectory.h
 StorageKit.h
-string
 StringCompare.h
 string.h
 String.h
@@ -1164,7 +1145,6 @@ UReanimator.h
 URegions.h
 URegistrar.h
 UResourceMgr.h
-utility
 #ifdef ANDROID
 utils/BitSet.h
 utils/CallStack.h
@@ -1196,13 +1176,11 @@ UTETextAction.h
 UTEViewTextAction.h
 UTextEdit.h
 UTextTraits.h
-utility
 utime.h
 UWindows.h
 values.h
 varargs.h
 vcclr.h
-vector
 View.h
 Volume.h
 wab.h
