@@ -405,7 +405,7 @@ AllocationIntegrityState::dump()
             CodePosition output(ins->id(), CodePosition::OUTPUT);
 
             fprintf(stderr, "[");
-            if (input != CodePosition::MIN)
+            if (input != CodePosition::MIN_R)
                 fprintf(stderr, "%u,%u ", input.bits(), output.bits());
             fprintf(stderr, "%s]", ins->opName());
 
@@ -467,8 +467,8 @@ AllocationIntegrityState::dump()
 #endif
 }
 
-const CodePosition CodePosition::MAX(UINT_MAX);
-const CodePosition CodePosition::MIN(0);
+const CodePosition CodePosition::MAX_R(UINT_MAX_R);
+const CodePosition CodePosition::MIN_R(0);
 
 bool
 RegisterAllocator::init()

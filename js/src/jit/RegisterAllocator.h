@@ -153,8 +153,8 @@ class CodePosition
     uint32_t bits_;
 
   public:
-    static const CodePosition MAX;
-    static const CodePosition MIN;
+    static const CodePosition MAX_R;
+    static const CodePosition MIN_R;
 
     // This is the half of the instruction this code position represents, as
     // described in the huge comment above.
@@ -214,11 +214,11 @@ class CodePosition
     }
 
     CodePosition previous() const {
-        MOZ_ASSERT(*this != MIN);
+        MOZ_ASSERT(*this != MIN_R);
         return CodePosition(bits_ - 1);
     }
     CodePosition next() const {
-        MOZ_ASSERT(*this != MAX);
+        MOZ_ASSERT(*this != MAX_R);
         return CodePosition(bits_ + 1);
     }
 };
