@@ -223,6 +223,18 @@ ifdef SHARED_LIBRARY
 # Use CURDIR to avid clashes with .def files found in sources via VPATH
 DEF_FILE := $(CURDIR)/$(SHARED_LIBRARY:.dll=.def)
 endif
+ifndef MOZ_DEBUG
+ifdef MOZ_DEBUG_SYMBOLS
+ifneq ($(filter WLINK wlink,$(EMXOMFLD_TYPE)),)
+DEBUG_SYMFILE = $(basename $(1)).dbg
+OS_LDFLAGS += -Zlinker 'option symfile=$(basename $(@)).dbg'
+endif
+endif
+ifndef DEBUG_SYMFILE
+DEBUG_SYMFILE = $(basename $(1)).xqs
+DEBUG_SYMFILE_GEN = mapxqs $(basename $(1)).map -o $(basename $(1)).xqs
+endif
+endif
 endif # OS2
 
 ifeq (arm-Darwin,$(CPU_ARCH)-$(OS_TARGET))
