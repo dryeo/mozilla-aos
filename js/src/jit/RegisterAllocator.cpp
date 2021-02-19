@@ -467,7 +467,7 @@ AllocationIntegrityState::dump()
 #endif
 }
 
-const CodePosition CodePosition::MAX_R(UINT_MAX_R);
+const CodePosition CodePosition::MAX_R(UINT_MAX);
 const CodePosition CodePosition::MIN_R(0);
 
 bool
