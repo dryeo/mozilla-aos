@@ -1,1 +1,2 @@
-bww-resources-rpm cairo dash-sh fontconfig freetype hunspell libc libcx libgcc1 libicu libjpeg-turbo libkai libpng libstdc++ libvpx nspr nss nss-util os2-base os2-mpts pango pixman pthread zlib
+bww-resources-rpm cairo fontconfig freetype hunspell libc libcx libgcc1 libicu libjpeg-turbo libkai libpng libstdc++ libvpx nspr nss nss-util os2-base os2-mpts pango pixman pthread zlib
+Optionally for multimedia playback, ffmpeg-legacy-56
