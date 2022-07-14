@@ -6,6 +6,8 @@
 // N.B. the ns* & pr* headers below will #include all
 // of the standard library headers this file requires
 
+#include <sys/stat.h>
+
 #include "nsCOMPtr.h"
 #include "nsMemory.h"
 
@@ -1487,7 +1489,7 @@ nsLocalFile::CopyMove(nsIFile *aParentDir, const nsACString &newName, bool move)
     newParentDir->Exists(&exists);
     if (!exists)
     {
-        rv = newParentDir->Create(DIRECTORY_TYPE, 0644);  // TODO, what permissions should we use
+        rv = newParentDir->Create(DIRECTORY_TYPE, 0777);  // TODO, what permissions should we use
         if (NS_FAILED(rv))
             return rv;
     }
@@ -1550,7 +1552,7 @@ nsLocalFile::CopyMove(nsIFile *aParentDir, const nsACString &newName, bool move)
         if (!exists)
         {
             // if the destination directory cannot be created, return an error
-            rv = target->Create(DIRECTORY_TYPE, 0644);  // TODO, what permissions should we use
+            rv = target->Create(DIRECTORY_TYPE, 0777);  // TODO, what permissions should we use
             if (NS_FAILED(rv))
                 return rv;
         }
@@ -1709,7 +1711,7 @@ nsLocalFile::RenameToNative(nsIFile* aNewParentDir, const nsACString& aNewName)
     bool exists;
     targetParentDir->Exists(&exists);
     if (!exists) {
-        rv = targetParentDir->Create(DIRECTORY_TYPE, 0644);
+        rv = targetParentDir->Create(DIRECTORY_TYPE, 0777);
         if (NS_FAILED(rv)) {
             return rv;
         }
@@ -1950,6 +1952,16 @@ nsLocalFile::SetPermissions(uint32_t aPermissions)
     ULONG attr = 0;
     if (!(aPermissions & (PR_IWUSR|PR_IWGRP|PR_IWOTH)))
         attr = FILE_READONLY;
+#if 0 //chmod support
+    /*
+     * Race condition here: we should use fchmod instead, there's no way to
+     * guarantee the name still refers to the same file.
+     */
+    rc = (chmod(mWorkingPath.get(), aPermissions) >= 0);
+
+    if (rc != NO_ERROR)
+        return ConvertOS2Error(rc);
+#endif //chmod support
 
     if (attr == (pathInfo.attrFile & FILE_READONLY))
         return NS_OK;
