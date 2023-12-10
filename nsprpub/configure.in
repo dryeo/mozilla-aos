@@ -2493,6 +2493,7 @@ tools are selected during the Xcode/Developer Tools installation.])
     fi
     IMPLIB='emximp -o'
     FILTER='emxexp -o'
+    RANLIB="echo"
     if test -n "$MOZ_OS2_HIGH_MEMORY"; then
       LDFLAGS="$LDFLAGS -Zhigh-mem"
       AC_DEFINE(MOZ_OS2_HIGH_MEMORY)
