@@ -40,13 +40,36 @@ from mozpack.errors import errors
 from mozpack.packager.unpack import UnpackFinder
 from createprecomplete import generate_precomplete
 
+class UnpackFinder(UnpackFinder):
+
+    def __init__(self, *args, **kwargs):
+        self.ignorelist = kwargs.pop('ignorelist', [])
+        super(UnpackFinder, self).__init__(*args, **kwargs)
+
+    def _maybe_zip(self, path, file):
+        def check_ignore(p):
+            dn = False
+            for i in self.ignorelist:
+                if i in p:
+                    dn = True
+            return dn
+
+        if not check_ignore(path):
+            return super(UnpackFinder, self)._maybe_zip(path, file)
+        return False
+
 
 class LocaleManifestFinder(object):
-    def __init__(self, finder):
+    def __init__(self, finder, ignorelist=[]):
         entries = self.entries = []
         bases = self.bases = []
+        self.ignorelist = ignorelist
 
         class MockFormatter(object):
+            def __init__(self, ignorelist=[]):
+                self.ignorelist = ignorelist
+
+
             def add_interfaces(self, path, content):
                 pass
 
@@ -54,11 +77,26 @@ class LocaleManifestFinder(object):
                 pass
 
             def add_manifest(self, entry):
+                def check_ig(p):
+                    dn = False
+                    for i in self.ignorelist:
+                        if hasattr(p, 'name'):
+                            if i in p.name:
+                                dn = True
+                    return dn
                 if entry.localized:
-                    entries.append(entry)
+                    if not check_ig(entry):
+                        entries.append(entry)
 
             def add_base(self, base, addon=False):
-                bases.append(base)
+                def check_ignore(p):
+                    dn = False
+                    for i in self.ignorelist:
+                        if i in p:
+                            dn = True
+                    return dn
+                if not check_ignore(base):
+                    bases.append(base)
 
         # SimplePackager rejects "manifest foo.manifest" entries with
         # additional flags (such as "manifest foo.manifest application=bar").
@@ -66,23 +104,33 @@ class LocaleManifestFinder(object):
         # but are not necessary for the purpose of l10n repacking. So we wrap
         # the finder in order to remove those entries.
         class WrapFinder(object):
-            def __init__(self, finder):
+            def __init__(self, finder, ignorelist=[]):
                 self._finder = finder
+                self._ignorelist = []
 
             def find(self, pattern):
-                for p, f in self._finder.find(pattern):
-                    if isinstance(f, ManifestFile):
-                        unwanted = [
-                            e for e in f._entries
-                            if isinstance(e, Manifest) and e.flags
-                        ]
-                        if unwanted:
-                            f = ManifestFile(
-                                f._base,
-                                [e for e in f._entries if e not in unwanted])
-                    yield p, f
+                def check_ignore(pf):
+                    dn = False
+                    for i in self._ignorelist:
+                        if i in pf:
+                            dn = True
+                    return dn
+                if not check_ignore(pattern):
+                    for p, f in self._finder.find(pattern):
+                        if isinstance(f, ManifestFile):
+                            unwanted = [
+                                e for e in f._entries
+                                if isinstance(e, Manifest) and e.flags
+                            ]
+                            if unwanted:
+                                f = ManifestFile(
+                                    f._base,
+                                    [e for e in f._entries if e not in unwanted])
+                        yield p, f
 
-        sink = SimpleManifestSink(WrapFinder(finder), MockFormatter())
+        sink = SimpleManifestSink(WrapFinder(finder,
+                                             ignorelist=self.ignorelist),
+                                  MockFormatter(ignorelist=self.ignorelist))
         sink.add(Component(''), '*')
         sink.close(False)
 
@@ -91,16 +139,30 @@ class LocaleManifestFinder(object):
                                 if isinstance(e, ManifestLocale)))
 
 
-def _repack(app_finder, l10n_finder, copier, formatter, non_chrome=set()):
-    app = LocaleManifestFinder(app_finder)
+def _repack(app_finder, l10n_finder, copier, formatter, non_chrome=set(),
+            ignorelist=[]):
+
+    def check_ignore(p):
+        dn = False
+        for i in ignorelist:
+            if i in p:
+                dn = True
+        return dn
+
+    app = LocaleManifestFinder(app_finder, ignorelist=ignorelist)
     l10n = LocaleManifestFinder(l10n_finder)
 
     # The code further below assumes there's only one locale replaced with
     # another one.
-    if len(app.locales) > 1 or len(l10n.locales) > 1:
-        errors.fatal("Multiple locales aren't supported")
-    locale = app.locales[0]
+    if len(l10n.locales) > 1:
+        errors.fatal("Multiple l10n locales aren't supported: " +
+                      ",".join(l10n.locales))
     l10n_locale = l10n.locales[0]
+    locale = app.locales[0]
+
+    if len(app.locales) > 1:
+        if l10n_locale in app.locales:
+            locale = l10n_locale
 
     # For each base directory, store what path a locale chrome package name
     # corresponds to.
@@ -119,7 +181,8 @@ def _repack(app_finder, l10n_finder, copier, formatter, non_chrome=set()):
     # corresponds to a package path.
     paths = {}
     for e in app.entries:
-        if isinstance(e, ManifestEntryWithRelPath):
+        if isinstance(e, ManifestEntryWithRelPath) and \
+           not check_ignore(e.path):
             base = mozpath.basedir(e.path, app.bases)
             if base not in l10n_paths:
                 errors.fatal("Locale doesn't contain %s/" % base)
@@ -204,7 +267,8 @@ def _repack(app_finder, l10n_finder, copier, formatter, non_chrome=set()):
         copier[path].preload([l.replace(locale, l10n_locale) for l in log])
 
 
-def repack(source, l10n, extra_l10n={}, non_resources=[], non_chrome=set()):
+def repack(source, l10n, extra_l10n={}, non_resources=[], non_chrome=set(),
+           ignorelist=[]):
     '''
     Replace localized data from the `source` directory with localized data
     from `l10n` and `extra_l10n`.
@@ -224,14 +288,14 @@ def repack(source, l10n, extra_l10n={}, non_resources=[], non_chrome=set()):
     The `non_chrome` argument gives a list of file/directory patterns for
     localized files that are not listed in a chrome.manifest.
     '''
-    app_finder = UnpackFinder(source)
-    l10n_finder = UnpackFinder(l10n)
+    app_finder = UnpackFinder(source, ignorelist=ignorelist)
+    l10n_finder = UnpackFinder(l10n, ignorelist=ignorelist)
     if extra_l10n:
         finders = {
             '': l10n_finder,
         }
         for base, path in extra_l10n.iteritems():
-            finders[base] = UnpackFinder(path)
+            finders[base] = UnpackFinder(path, ignorelist=ignorelist)
         l10n_finder = ComposedFinder(finders)
     copier = FileCopier()
     if app_finder.kind == 'flat':
@@ -244,6 +308,6 @@ def repack(source, l10n, extra_l10n={}, non_resources=[], non_chrome=set()):
                                      non_resources=non_resources)
 
     with errors.accumulate():
-        _repack(app_finder, l10n_finder, copier, formatter, non_chrome)
+        _repack(app_finder, l10n_finder, copier, formatter, non_chrome, ignorelist=ignorelist)
     copier.copy(source, skip_if_older=False)
     generate_precomplete(source)

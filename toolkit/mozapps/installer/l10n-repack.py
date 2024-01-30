@@ -48,12 +48,15 @@ def main():
     parser.add_argument('--non-resource', nargs='+', metavar='PATTERN',
                         default=[],
                         help='Extra files not to be considered as resources')
+    parser.add_argument('--ignorelist', nargs='+', default=[],
+                        help='List of ignore patterns.')
     args = parser.parse_args()
 
     buildconfig.substs['USE_ELF_HACK'] = False
     buildconfig.substs['PKG_SKIP_STRIP'] = True
     l10n.repack(args.build, args.l10n, extra_l10n=dict(args.extra_l10n),
-                non_resources=args.non_resource, non_chrome=NON_CHROME)
+                non_resources=args.non_resource, non_chrome=NON_CHROME,
+                ignorelist=args.ignorelist)
 
 
 if __name__ == "__main__":

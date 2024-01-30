@@ -118,7 +118,8 @@ ifdef MOZ_STUB_INSTALLER
 endif
 	$(PYTHON) $(MOZILLA_DIR)/toolkit/mozapps/installer/l10n-repack.py $(STAGEDIST) $(DIST)/xpi-stage/locale-$(AB_CD) \
 		$(MOZ_PKG_EXTRAL10N) \
-		$(if $(filter omni,$(MOZ_PACKAGER_FORMAT)),$(if $(NON_OMNIJAR_FILES),--non-resource $(NON_OMNIJAR_FILES)))
+		$(if $(filter omni,$(MOZ_PACKAGER_FORMAT)),$(if $(NON_OMNIJAR_FILES),--non-resource $(NON_OMNIJAR_FILES))) \
+		--ignorelist inspector@ {59c81df5-4b modern chatzilla
 
 ifeq (cocoa,$(MOZ_WIDGET_TOOLKIT))
 ifneq (en,$(LPROJ_ROOT))
