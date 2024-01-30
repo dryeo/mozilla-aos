@@ -147,6 +147,10 @@ ifeq ($(OS_ARCH),HP-UX)
 	$(INSTALL) -m 755 $(SHARED_LIBRARY) $(dist_libdir)
 	$(INSTALL) -m 755 $(SHARED_LIBRARY) $(dist_bindir)
 else
+ifeq ($(OS_ARCH),OS2)
+	$(INSTALL) -m 755 $(SHARED_LIBRARY) $(dist_bindir)
+else
 	$(INSTALL) -m 444 $(SHARED_LIBRARY) $(dist_bindir)
+endif
 endif
 endif
