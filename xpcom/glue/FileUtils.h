@@ -11,6 +11,7 @@
 
 #if defined(XP_UNIX) || defined(XP_OS2)
 # include <unistd.h>
+# include <io.h>
 #elif defined(XP_WIN)
 # include <io.h>
 #endif
