@@ -5679,36 +5679,6 @@
     "kind": "flag",
     "description": "Whether the decoder for ISO-2022-JP has been instantiated in this session."
   },
-  "DECODER_INSTANTIATED_IBM850": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM850 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM852": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM852 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM855": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM855 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM857": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM857 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM862": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM862 has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_IBM866": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for IBM866 has been instantiated in this session."
-  },
   "DECODER_INSTANTIATED_MACGREEK": {
     "expires_in_version": "never",
     "kind": "flag",
@@ -5783,11 +5753,6 @@
     "expires_in_version": "never",
     "kind": "flag",
     "description": "Whether the decoder for KOI8U has been instantiated in this session."
-  },
-  "DECODER_INSTANTIATED_ISO_8859_5": {
-    "expires_in_version": "never",
-    "kind": "flag",
-    "description": "Whether the decoder for ISO-8859-5 has been instantiated in this session."
   },
   "LONG_REFLOW_INTERRUPTIBLE": {
     "expires_in_version": "never",
