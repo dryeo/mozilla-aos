@@ -965,6 +965,7 @@ case "$target" in
     if test "$EMXOMFLD_TYPE" = "WLINK" -o "$EMXOMFLD_TYPE" = "wlink"; then
         LDFLAGS="$LDFLAGS -Zlinker DISABLE\ 1121"
     fi
+    MOZ_FIX_LINK_PATHS=
     # Deliberately disable SSE/SSE2 (GCC/2 bug, see https://github.com/psmedley/gcc/issues/28)
     MOZ_OPTIMIZE_FLAGS="-O3 -march=pentium-m -mstackrealign"
     if test "$EMXOMFLD_TYPE" = "WLINK" -o "$EMXOMFLD_TYPE" = "wlink"; then
@@ -973,7 +974,7 @@ case "$target" in
         MOZ_OPTIMIZE_LDFLAGS="-Zlinker /EXEPACK:2 -Zlinker /PACKCODE -Zlinker /PACKDATA"
     fi
     TARGET_MD_ARCH=os2
-#    _PLATFORM_DEFAULT_TOOLKIT="cairo-os2"
+    _PLATFORM_DEFAULT_TOOLKIT="cairo-os2"
     RC=rc.exe
     MC=mc.exe
     RCFLAGS='-n'
