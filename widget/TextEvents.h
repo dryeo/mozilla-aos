@@ -22,7 +22,7 @@
 #include "nsRect.h"
 #include "nsStringGlue.h"
 #include "nsTArray.h"
-#include "WritingModes.h"
+#include "mozilla/WritingModes.h"
 
 class nsStringHashKey;
 template<class, class> class nsDataHashtable;
