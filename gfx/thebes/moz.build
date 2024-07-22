@@ -130,8 +130,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'os2':
         'gfxFT2FontBase.h',
         'gfxOS2Platform.h',
         'gfxOS2Surface.h',
-        'gfxPDFSurface.h',
-        'gfxPSSurface.h',
     ]
     SOURCES += [
         'gfxFcPlatformFontList.cpp',
@@ -141,8 +139,6 @@ elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'os2':
         'gfxFT2Utils.cpp',
         'gfxOS2Platform.cpp',
         'gfxOS2Surface.cpp',
-        'gfxPDFSurface.cpp',
-        'gfxPSSurface.cpp',
     ]
 
 elif CONFIG['MOZ_WIDGET_TOOLKIT'] == 'windows':
