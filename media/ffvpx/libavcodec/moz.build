@@ -10,6 +10,9 @@ if CONFIG['FFVPX_ASFLAGS']:
     DIRS += ['x86']
 
 SharedLibrary('mozavcodec')
+if CONFIG['OS_ARCH'] == 'OS2':
+    SHORT_LIBNAME = 'mozavcode'
+
 SOURCES += [
     'allcodecs.c',
     'audioconvert.c',
