@@ -13,7 +13,9 @@
 // obtained with this API; see TimeDuration::Resolution;
 //
 
+#ifndef XP_OS2
 #include <sys/syscall.h>
+#endif
 #include <time.h>
 #include <unistd.h>
 #include <string.h>
